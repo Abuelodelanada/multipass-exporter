@@ -1,7 +1,7 @@
 package collector
 
 import (
-	"context"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -10,43 +10,45 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// MultipassListOutput represents a single instance from `multipass list --format json`
+// MultipassListOutput mirrors JSON from `multipass list --format=json`
 type MultipassListOutput struct {
-	Name  string `json:"name"`
-	State string `json:"state"`
+	Name    string   `json:"name"`
+	State   string   `json:"state"`
+	IPv4    []string `json:"ipv4"`
+	Release string   `json:"release"`
 }
 
-// MultipassListResponse represents the root object returned by `multipass list --format json`
-type MultipassListResponse struct {
-	List []MultipassListOutput `json:"list"`
-}
-
-// MultipassCollector collects metrics about Multipass instances
+// MultipassCollector implements Prometheus collector
 type MultipassCollector struct {
 	instanceTotal *prometheus.Desc
+	timeout       time.Duration
 }
 
-// NewMultipassCollector creates a new MultipassCollector
-func NewMultipassCollector() *MultipassCollector {
+// NewMultipassCollector creates new collector
+func NewMultipassCollector(timeoutSecond int) *MultipassCollector {
 	return &MultipassCollector{
 		instanceTotal: prometheus.NewDesc(
 			"multipass_instance_total",
 			"Total number of Multipass instances",
 			nil, nil,
 		),
+		timeout: time.Duration(timeoutSecond) * time.Second,
 	}
 }
 
-// Describe sends the descriptors of each metric over to the provided channel.
+// Describe sends metrics descriptions
 func (c *MultipassCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.instanceTotal
 }
 
-// Collect fetches the stats and delivers them as Prometheus metrics
+// Collect fetches instance count and sends to Prometheus
 func (c *MultipassCollector) Collect(ch chan<- prometheus.Metric) {
-	count, err := getInstanceCount()
+	count, err := c.getInstanceCount()
 	if err != nil {
-		fmt.Printf("Error fetching instance count: %v\n", err)
+		ch <- prometheus.MustNewConstMetric(
+			prometheus.NewDesc("multipass_error", "Error parsing JSON from Multipass", nil, nil),
+			prometheus.GaugeValue, 1,
+		)
 		return
 	}
 
@@ -57,21 +59,32 @@ func (c *MultipassCollector) Collect(ch chan<- prometheus.Metric) {
 	)
 }
 
-// getInstanceCount returns the number of Multipass instances currently running
-func getInstanceCount() (int, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+// getInstanceCount runs `multipass list --format=json` and parses
+func (c *MultipassCollector) getInstanceCount() (int, error) {
+	cmd := exec.Command("multipass", "list", "--format=json")
 
-	cmd := exec.CommandContext(ctx, "multipass", "list", "--format", "json")
-	output, err := cmd.Output()
-	if err != nil {
-		return 0, fmt.Errorf("error executing multipass list: %w", err)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+
+	done := make(chan error, 1)
+	go func() { done <- cmd.Run() }()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			return 0, err
+		}
+	case <-time.After(c.timeout):
+		return 0, fmt.Errorf("timeout after %v", c.timeout)
 	}
 
-	var response MultipassListResponse
-	if err := json.Unmarshal(output, &response); err != nil {
+	var data struct {
+		List []MultipassListOutput `json:"list"`
+	}
+
+	if err := json.Unmarshal(out.Bytes(), &data); err != nil {
 		return 0, fmt.Errorf("error parsing JSON: %w", err)
 	}
 
-	return len(response.List), nil
+	return len(data.List), nil
 }
