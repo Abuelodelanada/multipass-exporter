@@ -12,8 +12,12 @@ import (
 
 func main() {
 	registry := prometheus.NewRegistry()
+
+	// Register Multipass collector
 	registry.MustRegister(collector.NewMultipassCollector())
+
 	http.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
-	log.Println("Multipass Exporter escuchando en :8080")
+
+	log.Println("Multipass Exporter is running on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
