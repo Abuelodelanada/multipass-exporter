@@ -11,13 +11,18 @@ import (
 )
 
 func main() {
-	registry := prometheus.NewRegistry()
+	// Create the Multipass collector
+	multipassCollector := collector.NewMultipassCollector()
 
-	// Register Multipass collector
-	registry.MustRegister(collector.NewMultipassCollector())
+	// Register the collector with Prometheus
+	prometheus.MustRegister(multipassCollector)
 
-	http.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
+	// Expose the metrics endpoint
+	http.Handle("/metrics", promhttp.Handler())
 
-	log.Println("Multipass Exporter is running on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	addr := ":8080"
+	log.Printf("Multipass Exporter is running on %s", addr)
+	if err := http.ListenAndServe(addr, nil); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
+	}
 }
