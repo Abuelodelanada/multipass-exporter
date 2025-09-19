@@ -28,6 +28,7 @@ type MultipassListResponse struct {
 type MultipassCollector struct {
 	instanceTotal   *prometheus.Desc
 	instanceRunning *prometheus.Desc
+	instanceStopped *prometheus.Desc
 	timeout         time.Duration
 }
 
@@ -44,6 +45,11 @@ func NewMultipassCollector(timeoutSecond int) *MultipassCollector {
 			"Total number of Multipass running instances",
 			nil, nil,
 		),
+		instanceStopped: prometheus.NewDesc(
+			"multipass_instance_stopped",
+			"Total number of Multipass stopped instances",
+			nil, nil,
+		),
 		timeout: time.Duration(timeoutSecond) * time.Second,
 	}
 }
@@ -52,6 +58,7 @@ func NewMultipassCollector(timeoutSecond int) *MultipassCollector {
 func (c *MultipassCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.instanceTotal
 	ch <- c.instanceRunning
+	ch <- c.instanceStopped
 }
 
 // Collect fetches instance count and sends to Prometheus
@@ -62,6 +69,11 @@ func (c *MultipassCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	if err := c.collectInstanceRunning(ch); err != nil {
+		c.collectError(ch, err)
+		return
+	}
+
+	if err := c.collectInstanceStopped(ch); err != nil {
 		c.collectError(ch, err)
 		return
 	}
@@ -96,6 +108,21 @@ func (c *MultipassCollector) collectInstanceRunning(ch chan<- prometheus.Metric)
 	)
 	return nil
 }
+
+func (c *MultipassCollector) collectInstanceStopped(ch chan<- prometheus.Metric) error {
+	count, err := c.getStoppedInstanceCount()
+	if err != nil {
+		return err
+	}
+
+	ch <- prometheus.MustNewConstMetric(
+		c.instanceStopped,
+		prometheus.GaugeValue,
+		float64(count),
+	)
+	return nil
+}
+
 
 // collectError sends error metric when something fails
 func (c *MultipassCollector) collectError(ch chan<- prometheus.Metric, err error) {
@@ -155,4 +182,19 @@ func (c *MultipassCollector) getRunningInstanceCount() (int, error) {
     }
 
     return runningCount, nil
+}
+
+func (c *MultipassCollector) getStoppedInstanceCount() (int, error) {
+	data, err := c.multipassList()
+	if err != nil {
+		return 0, err
+	}
+	stoppedCount := 0
+	for _, instance := range data.List {
+		if instance.State == "Stopped" {
+			stoppedCount++
+		}
+	}
+
+	return stoppedCount, nil
 }
