@@ -23,15 +23,32 @@ type MultipassListResponse struct {
 	List []MultipassListOutput `json:"list"`
 }
 
+// CommandExecutor interface for executing commands (useful for testing)
+type CommandExecutor interface {
+	CommandContext(ctx context.Context, name string, args ...string) *exec.Cmd
+}
+
+// RealCommandExecutor implements CommandExecutor using os/exec
+type RealCommandExecutor struct{}
+
+func (r RealCommandExecutor) CommandContext(ctx context.Context, name string, args ...string) *exec.Cmd {
+	return exec.CommandContext(ctx, name, args...)
+}
+
 // MultipassCollector implements Prometheus collector
 type MultipassCollector struct {
 	instanceTotal   *prometheus.Desc
 	instanceRunning *prometheus.Desc
 	instanceStopped *prometheus.Desc
 	timeout         time.Duration
+	executor        CommandExecutor
 }
 
 func NewMultipassCollector(timeoutSeconds int) *MultipassCollector {
+	return NewMultipassCollectorWithExecutor(timeoutSeconds, RealCommandExecutor{})
+}
+
+func NewMultipassCollectorWithExecutor(timeoutSeconds int, executor CommandExecutor) *MultipassCollector {
 	return &MultipassCollector{
 		instanceTotal: prometheus.NewDesc(
 			"multipass_instances_total",
@@ -48,7 +65,8 @@ func NewMultipassCollector(timeoutSeconds int) *MultipassCollector {
 			"Total number of Multipass stopped instances",
 			nil, nil,
 		),
-		timeout: time.Duration(timeoutSeconds) * time.Second,
+		timeout:  time.Duration(timeoutSeconds) * time.Second,
+		executor: executor,
 	}
 }
 
@@ -130,7 +148,7 @@ func (c *MultipassCollector) multipassList() (MultipassListResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "multipass", "list", "--format=json")
+	cmd := c.executor.CommandContext(ctx, "multipass", "list", "--format=json")
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
