@@ -23,7 +23,6 @@ type MultipassListResponse struct {
 	List []MultipassListOutput `json:"list"`
 }
 
-
 // MultipassCollector implements Prometheus collector
 type MultipassCollector struct {
 	instanceTotal   *prometheus.Desc
@@ -120,14 +119,12 @@ func (c *MultipassCollector) collectInstanceStopped(ch chan<- prometheus.Metric)
 	return nil
 }
 
-
 func (c *MultipassCollector) collectError(ch chan<- prometheus.Metric, err error) {
 	ch <- prometheus.MustNewConstMetric(
 		prometheus.NewDesc("multipass_error", "Error collecting metrics from Multipass", nil, nil),
 		prometheus.GaugeValue, 1,
 	)
 }
-
 
 func (c *MultipassCollector) multipassList() (MultipassListResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
@@ -154,28 +151,27 @@ func (c *MultipassCollector) multipassList() (MultipassListResponse, error) {
 	return data, nil
 }
 
-
 func (c *MultipassCollector) getInstanceCount() (int, error) {
-    data, err := c.multipassList()
-    if err != nil {
-	    return 0, err
-    }
-    return len(data.List), nil
+	data, err := c.multipassList()
+	if err != nil {
+		return 0, err
+	}
+	return len(data.List), nil
 }
 
 func (c *MultipassCollector) getRunningInstanceCount() (int, error) {
-    data, err := c.multipassList()
-    if err != nil {
-        return 0, err
-    }
-    runningCount := 0
-    for _, instance := range data.List {
-        if instance.State == "Running" {
-            runningCount++
-        }
-    }
+	data, err := c.multipassList()
+	if err != nil {
+		return 0, err
+	}
+	runningCount := 0
+	for _, instance := range data.List {
+		if instance.State == "Running" {
+			runningCount++
+		}
+	}
 
-    return runningCount, nil
+	return runningCount, nil
 }
 
 func (c *MultipassCollector) getStoppedInstanceCount() (int, error) {

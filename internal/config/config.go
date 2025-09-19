@@ -9,16 +9,16 @@ import (
 
 // Config holds exporter settings
 type Config struct {
-	Port          int    `yaml:"port"`
-	MetricsPath   string `yaml:"metrics_path"`
+	Port           int    `yaml:"port"`
+	MetricsPath    string `yaml:"metrics_path"`
 	TimeoutSeconds int    `yaml:"timeout_seconds"`
 }
 
 // LoadConfig loads YAML file or returns defaults
 func LoadConfig(path string) (*Config, error) {
 	cfg := &Config{
-		Port:          8080,
-		MetricsPath:   "/metrics",
+		Port:           8080,
+		MetricsPath:    "/metrics",
 		TimeoutSeconds: 5,
 	}
 
