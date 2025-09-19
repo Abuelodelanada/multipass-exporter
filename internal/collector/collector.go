@@ -33,24 +33,24 @@ type MultipassCollector struct {
 }
 
 // NewMultipassCollector creates new collector
-func NewMultipassCollector(timeoutSecond int) *MultipassCollector {
+func NewMultipassCollector(timeoutSeconds int) *MultipassCollector {
 	return &MultipassCollector{
 		instanceTotal: prometheus.NewDesc(
-			"multipass_instance_total",
+			"multipass_instances_total",
 			"Total number of Multipass instances",
 			nil, nil,
 		),
 		instanceRunning: prometheus.NewDesc(
-			"multipass_instance_running",
+			"multipass_instances_running",
 			"Total number of Multipass running instances",
 			nil, nil,
 		),
 		instanceStopped: prometheus.NewDesc(
-			"multipass_instance_stopped",
+			"multipass_instances_stopped",
 			"Total number of Multipass stopped instances",
 			nil, nil,
 		),
-		timeout: time.Duration(timeoutSecond) * time.Second,
+		timeout: time.Duration(timeoutSeconds) * time.Second,
 	}
 }
 

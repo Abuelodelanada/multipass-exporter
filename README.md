@@ -10,8 +10,9 @@ This exporter provides metrics about Multipass virtual machines, making it easy 
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `multipass_instance_total` | Gauge | Total number of Multipass instances |
-| `multipass_instance_running` | Gauge | Number of currently running Multipass instances |
+| `multipass_instances_total` | Gauge | Total number of Multipass instances |
+| `multipass_instances_running` | Gauge | Number of currently running Multipass instances |
+| `multipass_instances_stopped` | Gauge | Number of currently stopped Multipass instances |
 | `multipass_error` | Gauge | Error indicator (1 when collection fails, 0 otherwise) |
 
 ## Installation
@@ -82,13 +83,17 @@ http://localhost:9090/metrics
 Example output:
 
 ```
-# HELP multipass_instance_total Total number of Multipass instances
-# TYPE multipass_instance_total gauge
-multipass_instance_total 3
+# HELP multipass_instances_total Total number of Multipass instances
+# TYPE multipass_instances_total gauge
+multipass_instances_total 3
 
-# HELP multipass_instance_running Total number of Multipass running instances
-# TYPE multipass_instance_running gauge
-multipass_instance_running 2
+# HELP multipass_instances_running Total number of Multipass running instances
+# TYPE multipass_instances_running gauge
+multipass_instances_running 2
+
+# HELP multipass_instances_stopped Total number of Multipass stopped instances
+# TYPE multipass_instances_stopped gauge
+multipass_instances_stopped 1
 
 # HELP multipass_error Error collecting metrics from Multipass
 # TYPE multipass_error gauge

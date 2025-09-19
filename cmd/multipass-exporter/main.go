@@ -17,7 +17,7 @@ func main() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	c := collector.NewMultipassCollector(cfg.TimeoutSecond)
+	c := collector.NewMultipassCollector(cfg.TimeoutSeconds)
 	prometheus.MustRegister(c)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
