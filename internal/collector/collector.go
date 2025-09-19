@@ -32,7 +32,6 @@ type MultipassCollector struct {
 	timeout         time.Duration
 }
 
-// NewMultipassCollector creates new collector
 func NewMultipassCollector(timeoutSeconds int) *MultipassCollector {
 	return &MultipassCollector{
 		instanceTotal: prometheus.NewDesc(
@@ -79,7 +78,6 @@ func (c *MultipassCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-// collectInstanceTotal sends total instance count metric
 func (c *MultipassCollector) collectInstanceTotal(ch chan<- prometheus.Metric) error {
 	count, err := c.getInstanceCount()
 	if err != nil {
@@ -94,7 +92,6 @@ func (c *MultipassCollector) collectInstanceTotal(ch chan<- prometheus.Metric) e
 	return nil
 }
 
-// collectInstanceRunning sends running instance count metric
 func (c *MultipassCollector) collectInstanceRunning(ch chan<- prometheus.Metric) error {
 	count, err := c.getRunningInstanceCount()
 	if err != nil {
@@ -124,7 +121,6 @@ func (c *MultipassCollector) collectInstanceStopped(ch chan<- prometheus.Metric)
 }
 
 
-// collectError sends error metric when something fails
 func (c *MultipassCollector) collectError(ch chan<- prometheus.Metric, err error) {
 	ch <- prometheus.MustNewConstMetric(
 		prometheus.NewDesc("multipass_error", "Error collecting metrics from Multipass", nil, nil),
@@ -144,11 +140,9 @@ func (c *MultipassCollector) multipassList() (MultipassListResponse, error) {
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		// If context timed out, return specific error
 		if ctx.Err() == context.DeadlineExceeded {
 			return MultipassListResponse{}, fmt.Errorf("multipass list timed out after %v", c.timeout)
 		}
-		// include stderr for debugging
 		return MultipassListResponse{}, fmt.Errorf("multipass list failed: %w: %s", err, stderr.String())
 	}
 
