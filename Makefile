@@ -14,8 +14,9 @@ build:
 
 build-all:
 	go build -o multipass-exporter-linux-amd64 ./cmd/multipass-exporter
-	GOOS=darwin GOARCH=amd64 go build -o multipass-exporter-darwin-amd64 ./cmd/multipass-exporter
-	GOOS=windows GOARCH=amd64 go build -o multipass-exporter-windows-amd64.exe ./cmd/multipass-exporter
+	GOARCH=amd64 go build -o multipass-exporter-amd64 ./cmd/multipass-exporter
+	GOARCH=arm64 go build -o multipass-exporter-arm64 ./cmd/multipass-exporter
+	GOARCH=386 go build -o multipass-exporter-386 ./cmd/multipass-exporter
 
 run:
 	go run ./cmd/multipass-exporter
@@ -35,8 +36,8 @@ help:
 	@echo "  test          - Run tests with verbose output"
 	@echo "  test-cover    - Run tests with coverage"
 	@echo "  test-cover-html - Run tests and generate HTML coverage report"
-	@echo "  build         - Build the binary for current platform"
-	@echo "  build-all     - Build binaries for multiple platforms"
+	@echo "  build         - Build the binary for current Linux platform"
+	@echo "  build-all     - Build binaries for multiple Linux architectures"
 	@echo "  run           - Run the application (uses defaults or config.yaml)"
 	@echo "  clean         - Clean build artifacts"
 	@echo "  fmt           - Format code"

@@ -29,7 +29,7 @@ go build -o multipass-exporter ./cmd/multipass-exporter
 
 - Go 1.23 or later
 - Multipass installed and accessible in your PATH
-- Linux/macOS system
+- Linux system
 
 ## Configuration
 
@@ -116,37 +116,18 @@ scrape_configs:
     scrape_interval: 30s
 ```
 
-## Docker Usage
-
-You can run the exporter using Docker:
-
-```bash
-# Run with default configuration
-docker run -d \
-  --name multipass-exporter \
-  -p 8080:8080 \
-  multipass-exporter:latest
-
-# Run with custom configuration
-docker run -d \
-  --name multipass-exporter \
-  -p 9090:9090 \
-  -v $(pwd)/config.yaml:/app/config.yaml \
-  multipass-exporter:latest \
-  --config /app/config.yaml
-```
 
 ## Development
 
 ### Building
 
 ```bash
-# Build for current platform
+# Build for current Linux platform
 go build -o multipass-exporter ./cmd/multipass-exporter
 
-# Build for multiple platforms
-go build -o multipass-exporter-linux-amd64 ./cmd/multipass-exporter
-GOOS=darwin GOARCH=amd64 go build -o multipass-exporter-darwin-amd64 ./cmd/multipass-exporter
+# Build for different Linux architectures
+GOARCH=amd64 go build -o multipass-exporter-amd64 ./cmd/multipass-exporter
+GOARCH=arm64 go build -o multipass-exporter-arm64 ./cmd/multipass-exporter
 ```
 
 ### Testing
