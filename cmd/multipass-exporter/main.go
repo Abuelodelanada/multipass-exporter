@@ -23,8 +23,8 @@ func main() {
 	if configPath == "" {
 		// Use default configuration
 		cfg = &config.Config{
-			Port:          8080,
-			MetricsPath:   "/metrics",
+			Port:           8080,
+			MetricsPath:    "/metrics",
 			TimeoutSeconds: 5,
 		}
 		log.Printf("Using default configuration: port=%d, metrics_path=%s, timeout_seconds=%d",
