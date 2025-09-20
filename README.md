@@ -63,13 +63,17 @@ timeout_seconds: 5
 ### Running the Exporter
 
 ```bash
-# Run with default configuration
+# Show help
+./multipass-exporter --help
+
+# Run with default configuration (port 8080, /metrics endpoint)
 ./multipass-exporter
+
+# Run with config file
+./multipass-exporter --config config.yaml
 
 # Run with custom config file
-./multipass-exporter
-
-# The exporter automatically looks for config.yaml
+./multipass-exporter --config /path/to/custom-config.yaml
 ```
 
 ### Accessing Metrics
@@ -117,12 +121,19 @@ scrape_configs:
 You can run the exporter using Docker:
 
 ```bash
+# Run with default configuration
+docker run -d \
+  --name multipass-exporter \
+  -p 8080:8080 \
+  multipass-exporter:latest
+
+# Run with custom configuration
 docker run -d \
   --name multipass-exporter \
   -p 9090:9090 \
-  -v /var/run/docker.sock:/var/run/docker.sock \
   -v $(pwd)/config.yaml:/app/config.yaml \
-  multipass-exporter:latest
+  multipass-exporter:latest \
+  --config /app/config.yaml
 ```
 
 ## Development
@@ -147,7 +158,11 @@ go test ./...
 ### Running Locally
 
 ```bash
+# Run with default configuration
 go run ./cmd/multipass-exporter
+
+# Run with config file
+go run ./cmd/multipass-exporter --config config.yaml
 ```
 
 ## Security Considerations

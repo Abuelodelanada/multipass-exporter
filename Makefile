@@ -37,7 +37,7 @@ help:
 	@echo "  test-cover-html - Run tests and generate HTML coverage report"
 	@echo "  build         - Build the binary for current platform"
 	@echo "  build-all     - Build binaries for multiple platforms"
-	@echo "  run           - Run the application"
+	@echo "  run           - Run the application (uses defaults or config.yaml)"
 	@echo "  clean         - Clean build artifacts"
 	@echo "  fmt           - Format code"
 	@echo "  deps          - Download and tidy dependencies"
