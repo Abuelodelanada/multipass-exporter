@@ -23,6 +23,53 @@ type MultipassListResponse struct {
 	List []MultipassListOutput `json:"list"`
 }
 
+// MultipassInfoOutput mirrors JSON from `multipass info --format=json`
+type MultipassInfoOutput struct {
+	Name         string                 `json:"name"`
+	State        string                 `json:"state"`
+	IPv4         []string               `json:"ipv4"`
+	Release      string                 `json:"release"`
+	ImageHash    string                 `json:"image_hash"`
+	ImageRelease string                 `json:"image_release"`
+	Load         []float64              `json:"load"`
+	CPUCount     string                 `json:"cpu_count"`
+	Memory       MemoryInfo             `json:"memory"`
+	Disks        map[string]DiskInfo    `json:"disks"`
+	Mounts       map[string]interface{} `json:"mounts"`
+}
+
+type MemoryInfo struct {
+	Total int64 `json:"total"`
+	Used  int64 `json:"used"`
+}
+
+type DiskInfo struct {
+	Total string `json:"total"`
+	Used  string `json:"used"`
+}
+
+type Mount struct {
+	Name        string   `json:"name"`
+	Path        string   `json:"path"`
+	SourceType  string   `json:"source_type"`
+	UidMappings []UIDMap `json:"uid_mappings"`
+	GidMappings []GIDMap `json:"gid_mappings"`
+}
+
+type UIDMap struct {
+	HostUID     int `json:"host_uid"`
+	InstanceUID int `json:"instance_uid"`
+}
+
+type GIDMap struct {
+	HostGID     int `json:"host_gid"`
+	InstanceGID int `json:"instance_gid"`
+}
+
+type MultipassInfoResponse struct {
+	Info map[string]MultipassInfoOutput `json:"info"`
+}
+
 // CommandExecutor interface for executing commands (useful for testing)
 type CommandExecutor interface {
 	CommandContext(ctx context.Context, name string, args ...string) *exec.Cmd
@@ -37,13 +84,14 @@ func (r RealCommandExecutor) CommandContext(ctx context.Context, name string, ar
 
 // MultipassCollector implements Prometheus collector
 type MultipassCollector struct {
-	instanceTotal     *prometheus.Desc
-	instanceRunning   *prometheus.Desc
-	instanceStopped   *prometheus.Desc
-	instanceDeleted   *prometheus.Desc
-	instanceSuspended *prometheus.Desc
-	timeout           time.Duration
-	executor          CommandExecutor
+	instanceTotal       *prometheus.Desc
+	instanceRunning     *prometheus.Desc
+	instanceStopped     *prometheus.Desc
+	instanceDeleted     *prometheus.Desc
+	instanceSuspended   *prometheus.Desc
+	instanceMemoryBytes *prometheus.Desc
+	timeout             time.Duration
+	executor            CommandExecutor
 }
 
 func NewMultipassCollector(timeoutSeconds int) *MultipassCollector {
@@ -77,6 +125,11 @@ func NewMultipassCollectorWithExecutor(timeoutSeconds int, executor CommandExecu
 			"Total number of Multipass suspended instances",
 			nil, nil,
 		),
+		instanceMemoryBytes: prometheus.NewDesc(
+			"multipass_instance_memory_bytes",
+			"Memory usage of Multipass instances in bytes",
+			[]string{"name", "release"}, nil,
+		),
 		timeout:  time.Duration(timeoutSeconds) * time.Second,
 		executor: executor,
 	}
@@ -89,6 +142,7 @@ func (c *MultipassCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.instanceStopped
 	ch <- c.instanceDeleted
 	ch <- c.instanceSuspended
+	ch <- c.instanceMemoryBytes
 }
 
 // Collect fetches instance count and sends to Prometheus
@@ -112,6 +166,10 @@ func (c *MultipassCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 	if err := c.collectInstanceSuspended(ch); err != nil {
+		c.collectError(ch, err)
+		return
+	}
+	if err := c.collectInstanceMemoryBytes(ch); err != nil {
 		c.collectError(ch, err)
 		return
 	}
@@ -187,6 +245,27 @@ func (c *MultipassCollector) collectInstanceSuspended(ch chan<- prometheus.Metri
 	return nil
 }
 
+func (c *MultipassCollector) collectInstanceMemoryBytes(ch chan<- prometheus.Metric) error {
+	data, err := c.multipassInfo()
+	if err != nil {
+		return err
+	}
+
+	for name, info := range data.Info {
+		if info.Memory.Used == 0 {
+			continue
+		}
+
+		ch <- prometheus.MustNewConstMetric(
+			c.instanceMemoryBytes,
+			prometheus.GaugeValue,
+			float64(info.Memory.Used),
+			name, info.Release,
+		)
+	}
+	return nil
+}
+
 func (c *MultipassCollector) collectError(ch chan<- prometheus.Metric, err error) {
 	ch <- prometheus.MustNewConstMetric(
 		prometheus.NewDesc("multipass_error", "Error collecting metrics from Multipass", nil, nil),
@@ -215,6 +294,31 @@ func (c *MultipassCollector) multipassList() (MultipassListResponse, error) {
 
 	if err := json.Unmarshal(out.Bytes(), &data); err != nil {
 		return MultipassListResponse{}, fmt.Errorf("error parsing JSON: %w; stdout=%s; stderr=%s", err, out.String(), stderr.String())
+	}
+	return data, nil
+}
+
+func (c *MultipassCollector) multipassInfo() (MultipassInfoResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
+	defer cancel()
+
+	cmd := c.executor.CommandContext(ctx, "multipass", "info", "--format=json")
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return MultipassInfoResponse{}, fmt.Errorf("multipass info timed out after %v", c.timeout)
+		}
+		return MultipassInfoResponse{}, fmt.Errorf("multipass info failed: %w: %s", err, stderr.String())
+	}
+
+	var data MultipassInfoResponse
+
+	if err := json.Unmarshal(out.Bytes(), &data); err != nil {
+		return MultipassInfoResponse{}, fmt.Errorf("error parsing JSON: %w; stdout=%s; stderr=%s", err, out.String(), stderr.String())
 	}
 	return data, nil
 }

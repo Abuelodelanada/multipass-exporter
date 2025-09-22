@@ -305,8 +305,8 @@ func TestDescribe(t *testing.T) {
 		descriptions = append(descriptions, desc)
 	}
 
-	if len(descriptions) != 5 {
-		t.Errorf("Expected 5 metric descriptions, got %d", len(descriptions))
+	if len(descriptions) != 6 {
+		t.Errorf("Expected 6 metric descriptions, got %d", len(descriptions))
 	}
 }
 
@@ -363,6 +363,96 @@ func TestRealCommandExecutor(t *testing.T) {
 
 	if string(output) != "test\n" {
 		t.Errorf("Expected output 'test\\n', got '%s'", string(output))
+	}
+}
+
+func TestCollectInstanceMemoryBytes_WithMock(t *testing.T) {
+	mockJSON := `{
+		"info": {
+			"instance1": {
+				"name": "instance1",
+				"state": "Running",
+				"ipv4": ["192.168.64.2"],
+				"release": "22.04 LTS",
+				"memory": {
+					"total": 1610612736,
+					"used": 536870912
+				}
+			},
+			"instance2": {
+				"name": "instance2",
+				"state": "Stopped",
+				"ipv4": [],
+				"release": "20.04 LTS",
+				"memory": {
+					"total": 1073741824,
+					"used": 268435456
+				}
+			}
+		}
+	}`
+	mockExecutor := &MockCommandExecutor{output: mockJSON}
+
+	collector := NewMultipassCollectorWithExecutor(5, mockExecutor)
+	ch := make(chan prometheus.Metric, 10)
+
+	err := collector.collectInstanceMemoryBytes(ch)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	close(ch)
+
+	metricCount := 0
+	var values []float64
+	var names []string
+	var releases []string
+
+	for metric := range ch {
+		metricCount++
+		pb := &dto.Metric{}
+		if err := metric.Write(pb); err != nil {
+			t.Fatalf("Failed to write metric: %v", err)
+		}
+
+		values = append(values, *pb.Gauge.Value)
+		if pb.Label != nil {
+			for _, label := range pb.Label {
+				if label.GetName() == "name" {
+					names = append(names, label.GetValue())
+				}
+				if label.GetName() == "release" {
+					releases = append(releases, label.GetValue())
+				}
+			}
+		}
+	}
+
+	if metricCount != 2 {
+		t.Errorf("Expected 2 metrics, got %d", metricCount)
+	}
+
+	if len(values) != 2 {
+		t.Errorf("Expected 2 values, got %d", len(values))
+	}
+
+	if values[0] != 536870912 && values[1] != 536870912 {
+		t.Errorf("Expected one metric to be 536870912 (512MB), but got %f and %f", values[0], values[1])
+	}
+	if values[0] != 268435456 && values[1] != 268435456 {
+		t.Errorf("Expected one metric to be 268435456 (256MB), but got %f and %f", values[0], values[1])
+	}
+}
+
+func TestCollectInstanceMemoryBytes_WithError(t *testing.T) {
+	mockExecutor := &MockCommandExecutor{err: fmt.Errorf("command failed")}
+
+	collector := NewMultipassCollectorWithExecutor(5, mockExecutor)
+	ch := make(chan prometheus.Metric, 1)
+
+	err := collector.collectInstanceMemoryBytes(ch)
+	if err == nil {
+		t.Fatal("Expected error, got nil")
 	}
 }
 
