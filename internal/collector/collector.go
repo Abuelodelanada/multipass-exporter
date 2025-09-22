@@ -132,7 +132,7 @@ func (c *MultipassCollector) collectInstanceTotal(ch chan<- prometheus.Metric) e
 }
 
 func (c *MultipassCollector) collectInstanceRunning(ch chan<- prometheus.Metric) error {
-	count, err := c.getRunningInstanceCount()
+	count, err := c.getInstanceCountByState("Running")
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func (c *MultipassCollector) collectInstanceRunning(ch chan<- prometheus.Metric)
 }
 
 func (c *MultipassCollector) collectInstanceStopped(ch chan<- prometheus.Metric) error {
-	count, err := c.getStoppedInstanceCount()
+	count, err := c.getInstanceCountByState("Stopped")
 	if err != nil {
 		return err
 	}
@@ -160,7 +160,7 @@ func (c *MultipassCollector) collectInstanceStopped(ch chan<- prometheus.Metric)
 }
 
 func (c *MultipassCollector) collectInstanceDeleted(ch chan<- prometheus.Metric) error {
-	count, err := c.getDeletedInstanceCount()
+	count, err := c.getInstanceCountByState("Deleted")
 	if err != nil {
 		return err
 	}
@@ -174,7 +174,7 @@ func (c *MultipassCollector) collectInstanceDeleted(ch chan<- prometheus.Metric)
 }
 
 func (c *MultipassCollector) collectInstanceSuspended(ch chan<- prometheus.Metric) error {
-	count, err := c.getSuspendedInstanceCount()
+	count, err := c.getInstanceCountByState("Suspended")
 	if err != nil {
 		return err
 	}
@@ -227,62 +227,17 @@ func (c *MultipassCollector) getInstanceCount() (int, error) {
 	return len(data.List), nil
 }
 
-func (c *MultipassCollector) getRunningInstanceCount() (int, error) {
+func (c *MultipassCollector) getInstanceCountByState(state string) (int, error) {
 	data, err := c.multipassList()
 	if err != nil {
 		return 0, err
 	}
-	runningCount := 0
+	instanceCount := 0
 	for _, instance := range data.List {
-		if instance.State == "Running" {
-			runningCount++
+		if instance.State == state {
+			instanceCount++
 		}
 	}
 
-	return runningCount, nil
-}
-
-func (c *MultipassCollector) getStoppedInstanceCount() (int, error) {
-	data, err := c.multipassList()
-	if err != nil {
-		return 0, err
-	}
-	stoppedCount := 0
-	for _, instance := range data.List {
-		if instance.State == "Stopped" {
-			stoppedCount++
-		}
-	}
-
-	return stoppedCount, nil
-}
-
-func (c *MultipassCollector) getDeletedInstanceCount() (int, error) {
-	data, err := c.multipassList()
-	if err != nil {
-		return 0, err
-	}
-	stoppedCount := 0
-	for _, instance := range data.List {
-		if instance.State == "Deleted" {
-			stoppedCount++
-		}
-	}
-
-	return stoppedCount, nil
-}
-
-func (c *MultipassCollector) getSuspendedInstanceCount() (int, error) {
-	data, err := c.multipassList()
-	if err != nil {
-		return 0, err
-	}
-	stoppedCount := 0
-	for _, instance := range data.List {
-		if instance.State == "Suspended" {
-			stoppedCount++
-		}
-	}
-
-	return stoppedCount, nil
+	return instanceCount, nil
 }
