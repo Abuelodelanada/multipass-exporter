@@ -37,12 +37,13 @@ func (r RealCommandExecutor) CommandContext(ctx context.Context, name string, ar
 
 // MultipassCollector implements Prometheus collector
 type MultipassCollector struct {
-	instanceTotal   *prometheus.Desc
-	instanceRunning *prometheus.Desc
-	instanceStopped *prometheus.Desc
-	instanceDeleted *prometheus.Desc
-	timeout         time.Duration
-	executor        CommandExecutor
+	instanceTotal     *prometheus.Desc
+	instanceRunning   *prometheus.Desc
+	instanceStopped   *prometheus.Desc
+	instanceDeleted   *prometheus.Desc
+	instanceSuspended *prometheus.Desc
+	timeout           time.Duration
+	executor          CommandExecutor
 }
 
 func NewMultipassCollector(timeoutSeconds int) *MultipassCollector {
@@ -71,6 +72,11 @@ func NewMultipassCollectorWithExecutor(timeoutSeconds int, executor CommandExecu
 			"Total number of Multipass deleted instances",
 			nil, nil,
 		),
+		instanceSuspended: prometheus.NewDesc(
+			"multipass_instances_suspended",
+			"Total number of Multipass suspended instances",
+			nil, nil,
+		),
 		timeout:  time.Duration(timeoutSeconds) * time.Second,
 		executor: executor,
 	}
@@ -82,6 +88,7 @@ func (c *MultipassCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.instanceRunning
 	ch <- c.instanceStopped
 	ch <- c.instanceDeleted
+	ch <- c.instanceSuspended
 }
 
 // Collect fetches instance count and sends to Prometheus
@@ -101,6 +108,10 @@ func (c *MultipassCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 	if err := c.collectInstanceDeleted(ch); err != nil {
+		c.collectError(ch, err)
+		return
+	}
+	if err := c.collectInstanceSuspended(ch); err != nil {
 		c.collectError(ch, err)
 		return
 	}
@@ -156,6 +167,20 @@ func (c *MultipassCollector) collectInstanceDeleted(ch chan<- prometheus.Metric)
 
 	ch <- prometheus.MustNewConstMetric(
 		c.instanceDeleted,
+		prometheus.GaugeValue,
+		float64(count),
+	)
+	return nil
+}
+
+func (c *MultipassCollector) collectInstanceSuspended(ch chan<- prometheus.Metric) error {
+	count, err := c.getSuspendedInstanceCount()
+	if err != nil {
+		return err
+	}
+
+	ch <- prometheus.MustNewConstMetric(
+		c.instanceSuspended,
 		prometheus.GaugeValue,
 		float64(count),
 	)
@@ -240,6 +265,21 @@ func (c *MultipassCollector) getDeletedInstanceCount() (int, error) {
 	stoppedCount := 0
 	for _, instance := range data.List {
 		if instance.State == "Deleted" {
+			stoppedCount++
+		}
+	}
+
+	return stoppedCount, nil
+}
+
+func (c *MultipassCollector) getSuspendedInstanceCount() (int, error) {
+	data, err := c.multipassList()
+	if err != nil {
+		return 0, err
+	}
+	stoppedCount := 0
+	for _, instance := range data.List {
+		if instance.State == "Suspended" {
 			stoppedCount++
 		}
 	}

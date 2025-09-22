@@ -305,8 +305,8 @@ func TestDescribe(t *testing.T) {
 		descriptions = append(descriptions, desc)
 	}
 
-	if len(descriptions) != 4 {
-		t.Errorf("Expected 3 metric descriptions, got %d", len(descriptions))
+	if len(descriptions) != 5 {
+		t.Errorf("Expected 5 metric descriptions, got %d", len(descriptions))
 	}
 }
 
