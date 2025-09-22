@@ -40,6 +40,7 @@ type MultipassCollector struct {
 	instanceTotal   *prometheus.Desc
 	instanceRunning *prometheus.Desc
 	instanceStopped *prometheus.Desc
+	instanceDeleted *prometheus.Desc
 	timeout         time.Duration
 	executor        CommandExecutor
 }
@@ -65,6 +66,11 @@ func NewMultipassCollectorWithExecutor(timeoutSeconds int, executor CommandExecu
 			"Total number of Multipass stopped instances",
 			nil, nil,
 		),
+		instanceDeleted: prometheus.NewDesc(
+			"multipass_instances_deleted",
+			"Total number of Multipass deleted instances",
+			nil, nil,
+		),
 		timeout:  time.Duration(timeoutSeconds) * time.Second,
 		executor: executor,
 	}
@@ -75,6 +81,7 @@ func (c *MultipassCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.instanceTotal
 	ch <- c.instanceRunning
 	ch <- c.instanceStopped
+	ch <- c.instanceDeleted
 }
 
 // Collect fetches instance count and sends to Prometheus
@@ -90,6 +97,10 @@ func (c *MultipassCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	if err := c.collectInstanceStopped(ch); err != nil {
+		c.collectError(ch, err)
+		return
+	}
+	if err := c.collectInstanceDeleted(ch); err != nil {
 		c.collectError(ch, err)
 		return
 	}
@@ -131,6 +142,20 @@ func (c *MultipassCollector) collectInstanceStopped(ch chan<- prometheus.Metric)
 
 	ch <- prometheus.MustNewConstMetric(
 		c.instanceStopped,
+		prometheus.GaugeValue,
+		float64(count),
+	)
+	return nil
+}
+
+func (c *MultipassCollector) collectInstanceDeleted(ch chan<- prometheus.Metric) error {
+	count, err := c.getDeletedInstanceCount()
+	if err != nil {
+		return err
+	}
+
+	ch <- prometheus.MustNewConstMetric(
+		c.instanceDeleted,
 		prometheus.GaugeValue,
 		float64(count),
 	)
@@ -200,6 +225,21 @@ func (c *MultipassCollector) getStoppedInstanceCount() (int, error) {
 	stoppedCount := 0
 	for _, instance := range data.List {
 		if instance.State == "Stopped" {
+			stoppedCount++
+		}
+	}
+
+	return stoppedCount, nil
+}
+
+func (c *MultipassCollector) getDeletedInstanceCount() (int, error) {
+	data, err := c.multipassList()
+	if err != nil {
+		return 0, err
+	}
+	stoppedCount := 0
+	for _, instance := range data.List {
+		if instance.State == "Deleted" {
 			stoppedCount++
 		}
 	}
