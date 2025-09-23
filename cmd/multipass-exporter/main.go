@@ -39,11 +39,6 @@ func NewApp() *App {
 	}
 }
 
-func NewAppWithConfig(configPath string) *App {
-	return &App{
-		configPath: configPath,
-	}
-}
 
 func (a *App) LoadConfiguration() error {
 	var err error

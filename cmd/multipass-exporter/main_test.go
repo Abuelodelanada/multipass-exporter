@@ -109,12 +109,20 @@ func TestNewApp(t *testing.T) {
 	}
 }
 
-func TestNewAppWithConfig(t *testing.T) {
-	// Test NewAppWithConfig with specific config path
-	app := NewAppWithConfig("test.yaml")
+// createTestApp creates a test App instance with a specific config path
+// This is a test helper function to avoid flag parsing conflicts
+func createTestApp(configPath string) *App {
+	return &App{
+		configPath: configPath,
+	}
+}
+
+func TestCreateTestApp(t *testing.T) {
+	// Test createTestApp helper function
+	app := createTestApp("test.yaml")
 
 	if app == nil {
-		t.Error("NewAppWithConfig should not return nil")
+		t.Error("createTestApp should not return nil")
 	}
 
 	if app.configPath != "test.yaml" {
@@ -168,7 +176,7 @@ log_level: "debug"
 	tmpFile.Close()
 
 	// Test loading configuration from file
-	app := NewAppWithConfig(tmpFile.Name())
+	app := createTestApp(tmpFile.Name())
 
 	err = app.LoadConfiguration()
 	if err != nil {
@@ -191,7 +199,7 @@ log_level: "debug"
 }
 
 func TestAppLoadConfigurationInvalidFile(t *testing.T) {
-	app := NewAppWithConfig("/non/existent/file.yaml")
+	app := createTestApp("/non/existent/file.yaml")
 
 	err := app.LoadConfiguration()
 	if err != nil {
