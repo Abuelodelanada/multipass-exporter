@@ -1,12 +1,9 @@
-<center>
-  <picture>
-    <source srcset="images/logo.png?raw=true">
-    <img alt="Multipass Exporter" src="images/logo.png?raw=true" width="20%">
-  </picture>
-</center>
+<h1 align="center">
+  <img src="images/logo.png?raw=true" alt="Multipass Exporter" width="20%">
+  <br />
+  Multipass Exporter
+</h1>
 
-
-# Multipass Exporter
 
 A Prometheus exporter for [Multipass](https://multipass.run/) that exposes metrics about your Multipass instances.
 
