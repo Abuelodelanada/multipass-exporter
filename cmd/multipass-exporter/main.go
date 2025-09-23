@@ -45,12 +45,7 @@ func (a *App) LoadConfiguration() error {
 
 	if a.configPath == "" {
 		// Use default configuration
-		a.cfg = &config.Config{
-			Port:           1986,
-			MetricsPath:    "/metrics",
-			TimeoutSeconds: 5,
-			LogLevel:       "info",
-		}
+		a.cfg = config.DefaultConfig()
 		log.Printf("Using default configuration: port=%d, metrics_path=%s, timeout_seconds=%d, log_level=%s",
 			a.cfg.Port, a.cfg.MetricsPath, a.cfg.TimeoutSeconds, a.cfg.LogLevel)
 	} else {

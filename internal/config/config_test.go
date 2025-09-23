@@ -151,3 +151,23 @@ func TestLoadConfig_EmptyFile(t *testing.T) {
 		t.Errorf("Expected default timeout 5 seconds for empty file, got %d", cfg.TimeoutSeconds)
 	}
 }
+
+func TestDefaultConfig(t *testing.T) {
+	cfg := DefaultConfig()
+
+	if cfg.Port != 1986 {
+		t.Errorf("Expected default port 1986, got %d", cfg.Port)
+	}
+
+	if cfg.MetricsPath != "/metrics" {
+		t.Errorf("Expected default metrics path /metrics, got %s", cfg.MetricsPath)
+	}
+
+	if cfg.TimeoutSeconds != 5 {
+		t.Errorf("Expected default timeout 5 seconds, got %d", cfg.TimeoutSeconds)
+	}
+
+	if cfg.LogLevel != "info" {
+		t.Errorf("Expected default log level info, got %s", cfg.LogLevel)
+	}
+}

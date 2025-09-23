@@ -9,12 +9,7 @@ import (
 
 func TestConfigValidation(t *testing.T) {
 	// Test that we can create a valid config
-	cfg := &config.Config{
-		Port:           1986,
-		MetricsPath:    "/metrics",
-		TimeoutSeconds: 5,
-		LogLevel:       "info",
-	}
+	cfg := config.DefaultConfig()
 
 	if cfg.Port <= 0 {
 		t.Error("Port should be positive")

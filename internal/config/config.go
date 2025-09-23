@@ -15,15 +15,20 @@ type Config struct {
 	LogLevel       string `yaml:"log_level"`
 }
 
-// LoadConfig loads YAML file or returns defaults
-// Returns a boolean indicating if the file was actually loaded
-func LoadConfig(path string) (*Config, bool, error) {
-	cfg := &Config{
+// DefaultConfig returns a new Config with default values
+func DefaultConfig() *Config {
+	return &Config{
 		Port:           1986,
 		MetricsPath:    "/metrics",
 		TimeoutSeconds: 5,
 		LogLevel:       "info",
 	}
+}
+
+// LoadConfig loads YAML file or returns defaults
+// Returns a boolean indicating if the file was actually loaded
+func LoadConfig(path string) (*Config, bool, error) {
+	cfg := DefaultConfig()
 
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
