@@ -52,55 +52,65 @@ func (f *FailingCommandExecutor) CommandContext(ctx context.Context, name string
 	return cmd
 }
 
-func TestMultipassList_Success(t *testing.T) {
+func TestMultipassInfo_Success(t *testing.T) {
 	// Test the JSON parsing logic directly
 	testJSON := `{
-		"list": [
-			{
+		"info": {
+			"instance1": {
 				"name": "instance1",
 				"state": "Running",
 				"ipv4": ["192.168.64.2"],
-				"release": "22.04 LTS"
+				"release": "22.04 LTS",
+				"memory": {
+					"total": 1073741824,
+					"used": 536870912
+				}
 			},
-			{
+			"instance2": {
 				"name": "instance2",
 				"state": "Stopped",
 				"ipv4": [],
-				"release": "20.04 LTS"
+				"release": "20.04 LTS",
+				"memory": {
+					"total": 1073741824,
+					"used": 268435456
+				}
 			}
-		]
+		}
 	}`
 
-	var data MultipassListResponse
+	var data MultipassInfoResponse
 	err := json.Unmarshal([]byte(testJSON), &data)
 
 	if err != nil {
 		t.Fatalf("Failed to parse test JSON: %v", err)
 	}
 
-	if len(data.List) != 2 {
-		t.Errorf("Expected 2 instances, got %d", len(data.List))
+	if len(data.Info) != 2 {
+		t.Errorf("Expected 2 instances, got %d", len(data.Info))
 	}
 
-	if data.List[0].Name != "instance1" {
-		t.Errorf("Expected first instance name 'instance1', got '%s'", data.List[0].Name)
+	instance1 := data.Info["instance1"]
+	if instance1.Name != "instance1" {
+		t.Errorf("Expected first instance name 'instance1', got '%s'", instance1.Name)
 	}
 
-	if data.List[0].State != "Running" {
-		t.Errorf("Expected first instance state 'Running', got '%s'", data.List[0].State)
+	if instance1.State != "Running" {
+		t.Errorf("Expected first instance state 'Running', got '%s'", instance1.State)
 	}
 
-	if data.List[1].Name != "instance2" {
-		t.Errorf("Expected second instance name 'instance2', got '%s'", data.List[1].Name)
+	instance2 := data.Info["instance2"]
+	if instance2.Name != "instance2" {
+		t.Errorf("Expected second instance name 'instance2', got '%s'", instance2.Name)
 	}
 
-	if data.List[1].State != "Stopped" {
-		t.Errorf("Expected second instance state 'Stopped', got '%s'", data.List[1].State)
+	if instance2.State != "Stopped" {
+		t.Errorf("Expected second instance state 'Stopped', got '%s'", instance2.State)
 	}
 }
 
 func TestCollectInstanceTotal_WithMock(t *testing.T) {
-	mockJSON := `{"list": [{"name": "test1", "state": "Running", "ipv4": [], "release": "22.04 LTS"}]}`
+	mockJSON := `{"info": {"test1": {"name": "test1", "state": "Running", "ipv4": [], "release": "22.04 LTS", "memory": {"total": 1073741824, "used": 536870912}}}}`
 	mockExecutor := &MockCommandExecutor{output: mockJSON}
 
 	collector := NewMultipassCollectorWithExecutor(5, mockExecutor)
@@ -130,11 +140,11 @@ func TestCollectInstanceTotal_WithMock(t *testing.T) {
 
 func TestCollectInstanceRunning_WithMock(t *testing.T) {
 	mockJSON := `{
-		"list": [
-			{"name": "test1", "state": "Running", "ipv4": [], "release": "22.04 LTS"},
-			{"name": "test2", "state": "Stopped", "ipv4": [], "release": "22.04 LTS"},
-			{"name": "test3", "state": "Running", "ipv4": [], "release": "22.04 LTS"}
-		]
+		"info": {
+			"test1": {"name": "test1", "state": "Running", "ipv4": [], "release": "22.04 LTS", "memory": {"total": 1073741824, "used": 536870912}},
+			"test2": {"name": "test2", "state": "Stopped", "ipv4": [], "release": "22.04 LTS", "memory": {"total": 1073741824, "used": 268435456}},
+			"test3": {"name": "test3", "state": "Running", "ipv4": [], "release": "22.04 LTS", "memory": {"total": 1073741824, "used": 536870912}}
+		}
 	}`
 	mockExecutor := &MockCommandExecutor{output: mockJSON}
 
@@ -164,11 +174,11 @@ func TestCollectInstanceRunning_WithMock(t *testing.T) {
 
 func TestCollectInstanceStopped_WithMock(t *testing.T) {
 	mockJSON := `{
-		"list": [
-			{"name": "test1", "state": "Running", "ipv4": [], "release": "22.04 LTS"},
-			{"name": "test2", "state": "Stopped", "ipv4": [], "release": "22.04 LTS"},
-			{"name": "test3", "state": "Stopped", "ipv4": [], "release": "22.04 LTS"}
-		]
+		"info": {
+			"test1": {"name": "test1", "state": "Running", "ipv4": [], "release": "22.04 LTS", "memory": {"total": 1073741824, "used": 536870912}},
+			"test2": {"name": "test2", "state": "Stopped", "ipv4": [], "release": "22.04 LTS", "memory": {"total": 1073741824, "used": 268435456}},
+			"test3": {"name": "test3", "state": "Stopped", "ipv4": [], "release": "22.04 LTS", "memory": {"total": 1073741824, "used": 268435456}}
+		}
 	}`
 	mockExecutor := &MockCommandExecutor{output: mockJSON}
 
@@ -310,15 +320,19 @@ func TestDescribe(t *testing.T) {
 	}
 }
 
-func TestMultipassListOutput_JSONUnmarshal(t *testing.T) {
+func TestMultipassInfoOutput_JSONUnmarshal(t *testing.T) {
 	jsonStr := `{
 		"name": "test-instance",
 		"state": "Running",
 		"ipv4": ["192.168.64.2", "10.0.0.1"],
-		"release": "22.04 LTS"
+		"release": "22.04 LTS",
+		"memory": {
+			"total": 2147483648,
+			"used": 1073741824
+		}
 	}`
 
-	var output MultipassListOutput
+	var output MultipassInfoOutput
 	err := json.Unmarshal([]byte(jsonStr), &output)
 
 	if err != nil {
@@ -343,6 +357,14 @@ func TestMultipassListOutput_JSONUnmarshal(t *testing.T) {
 
 	if output.Release != "22.04 LTS" {
 		t.Errorf("Expected release '22.04 LTS', got '%s'", output.Release)
+	}
+
+	if output.Memory.Total != 2147483648 {
+		t.Errorf("Expected memory total 2147483648, got %d", output.Memory.Total)
+	}
+
+	if output.Memory.Used != 1073741824 {
+		t.Errorf("Expected memory used 1073741824, got %d", output.Memory.Used)
 	}
 }
 
@@ -394,9 +416,16 @@ func TestCollectInstanceMemoryBytes_WithMock(t *testing.T) {
 	mockExecutor := &MockCommandExecutor{output: mockJSON}
 
 	collector := NewMultipassCollectorWithExecutor(5, mockExecutor)
+
+	// Parse the JSON manually to create the data object
+	var data MultipassInfoResponse
+	if err := json.Unmarshal([]byte(mockJSON), &data); err != nil {
+		t.Fatalf("Failed to parse mock JSON: %v", err)
+	}
+
 	ch := make(chan prometheus.Metric, 10)
 
-	err := collector.collectInstanceMemoryBytes(ch)
+	err := collector.collectInstanceMemoryBytesWithData(ch, data)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -450,9 +479,12 @@ func TestCollectInstanceMemoryBytes_WithError(t *testing.T) {
 	collector := NewMultipassCollectorWithExecutor(5, mockExecutor)
 	ch := make(chan prometheus.Metric, 1)
 
-	err := collector.collectInstanceMemoryBytes(ch)
-	if err == nil {
-		t.Fatal("Expected error, got nil")
+	// Create empty data for error case
+	data := MultipassInfoResponse{Info: make(map[string]MultipassInfoOutput)}
+
+	err := collector.collectInstanceMemoryBytesWithData(ch, data)
+	if err != nil {
+		t.Fatalf("Expected no error with empty data, got %v", err)
 	}
 }
 

@@ -12,6 +12,7 @@ type Config struct {
 	Port           int    `yaml:"port"`
 	MetricsPath    string `yaml:"metrics_path"`
 	TimeoutSeconds int    `yaml:"timeout_seconds"`
+	LogLevel       string `yaml:"log_level"`
 }
 
 // LoadConfig loads YAML file or returns defaults
@@ -20,6 +21,7 @@ func LoadConfig(path string) (*Config, error) {
 		Port:           8080,
 		MetricsPath:    "/metrics",
 		TimeoutSeconds: 5,
+		LogLevel:       "info",
 	}
 
 	data, err := ioutil.ReadFile(path)

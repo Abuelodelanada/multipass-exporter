@@ -4,7 +4,7 @@ A Prometheus exporter for [Multipass](https://multipass.run/) that exposes metri
 
 ## Overview
 
-This exporter provides metrics about Multipass virtual machines, making it easy to monitor your local development environment with Prometheus and visualize the data with Grafana.
+This exporter provides metrics about Multipass virtual machines, making it easy to monitor your local development environment with Prometheus.
 
 ## Metrics
 
@@ -13,6 +13,9 @@ This exporter provides metrics about Multipass virtual machines, making it easy 
 | `multipass_instances_total` | Gauge | Total number of Multipass instances |
 | `multipass_instances_running` | Gauge | Number of currently running Multipass instances |
 | `multipass_instances_stopped` | Gauge | Number of currently stopped Multipass instances |
+| `multipass_instances_deleted` | Gauge | Number of deleted Multipass instances |
+| `multipass_instances_suspended` | Gauge | Number of suspended Multipass instances |
+| `multipass_instance_memory_bytes` | Gauge | Memory usage of Multipass instances in bytes (with `name` and `release` labels) |
 | `multipass_error` | Gauge | Error indicator (1 when collection fails, 0 otherwise) |
 
 ## Installation
@@ -22,14 +25,13 @@ This exporter provides metrics about Multipass virtual machines, making it easy 
 ```bash
 git clone https://github.com/Abuelodelanada/multipass-exporter.git
 cd multipass-exporter
-go build -o multipass-exporter ./cmd/multipass-exporter
+make build
 ```
 
 ### Requirements
 
 - Go 1.23 or later
 - Multipass installed and accessible in your PATH
-- Linux system
 
 ## Configuration
 
@@ -48,15 +50,20 @@ metrics_path: /metrics
 
 # Timeout for multipass commands in seconds (default: 5)
 timeout_seconds: 5
+
+# Log level (default: info). Available levels: debug, info, warn, error, fatal
+# Logs are formatted as: LEVEL timestamp message fields
+log_level: debug
 ```
 
 ### Configuration Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `port` | 8080 | TCP port for the HTTP server |
+| `port` | 1986 | TCP port for the HTTP server |
 | `metrics_path` | /metrics | HTTP path for metrics endpoint |
 | `timeout_seconds` | 5 | Timeout for multipass command execution |
+| `log_level` | info | Log level (debug, info, warn, error, fatal) |
 
 ## Usage
 
@@ -81,7 +88,7 @@ timeout_seconds: 5
 Once running, access the metrics at:
 
 ```
-http://localhost:9090/metrics
+http://localhost:1986/metrics
 ```
 
 Example output:
@@ -89,15 +96,29 @@ Example output:
 ```
 # HELP multipass_instances_total Total number of Multipass instances
 # TYPE multipass_instances_total gauge
-multipass_instances_total 3
+multipass_instances_total 8
 
 # HELP multipass_instances_running Total number of Multipass running instances
 # TYPE multipass_instances_running gauge
-multipass_instances_running 2
+multipass_instances_running 6
 
 # HELP multipass_instances_stopped Total number of Multipass stopped instances
 # TYPE multipass_instances_stopped gauge
 multipass_instances_stopped 1
+
+# HELP multipass_instances_deleted Total number of Multipass deleted instances
+# TYPE multipass_instances_deleted gauge
+multipass_instances_deleted 1
+
+# HELP multipass_instances_suspended Total number of Multipass suspended instances
+# TYPE multipass_instances_suspended gauge
+multipass_instances_suspended 0
+
+# HELP multipass_instance_memory_bytes Memory usage of Multipass instances in bytes
+# TYPE multipass_instance_memory_bytes gauge
+multipass_instance_memory_bytes{name="charm-dev-36",release="Ubuntu 24.04.3 LTS"} 3.388157952e+09
+multipass_instance_memory_bytes{name="coslite",release="Ubuntu 22.04.2 LTS"} 2.986962944e+09
+multipass_instance_memory_bytes{name="edp",release="Ubuntu 23.10"} 1.530298368e+09
 
 # HELP multipass_error Error collecting metrics from Multipass
 # TYPE multipass_error gauge
@@ -150,7 +171,6 @@ go run ./cmd/multipass-exporter --config config.yaml
 
 - The exporter runs commands as the same user who executes it
 - Ensure the config file has appropriate permissions
-- Consider running behind a reverse proxy with authentication in production environments
 
 ## Troubleshooting
 
@@ -162,7 +182,28 @@ go run ./cmd/multipass-exporter --config config.yaml
 
 ### Debug Mode
 
-For troubleshooting, you can increase logging verbosity by checking the application output.
+For troubleshooting, you can configure debug logging through the configuration file:
+
+```yaml
+log_level: debug
+```
+
+Log format: `LEVEL timestamp message fields`
+
+Available log levels: `debug`, `info`, `warn`, `error`, `fatal`
+
+Example debug output:
+```
+INFO   [2025-09-22T23:35:03-03:00] Starting metrics collection
+DEBUG  [2025-09-22T23:35:03-03:00] Executing multipass info command
+INFO   [2025-09-22T23:35:03-03:00] Successfully parsed multipass info            instance_count=8
+DEBUG  [2025-09-22T23:35:03-03:00] Collecting instance total                     count=8
+DEBUG  [2025-09-22T23:35:03-03:00] Collecting instance running                   count=6
+DEBUG  [2025-09-22T23:35:03-03:00] Collecting instance stopped                   count=1
+DEBUG  [2025-09-22T23:35:03-03:00] Collecting instance deleted                   count=1
+DEBUG  [2025-09-22T23:35:03-03:00] Collecting instance suspended                 count=0
+INFO   [2025-09-22T23:35:03-03:00] Collecting memory metrics                     instance_count=8
+```
 
 ## Contributing
 

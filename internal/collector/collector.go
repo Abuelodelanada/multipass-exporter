@@ -9,19 +9,8 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 )
-
-// MultipassListOutput mirrors JSON from `multipass list --format=json`
-type MultipassListOutput struct {
-	Name    string   `json:"name"`
-	State   string   `json:"state"`
-	IPv4    []string `json:"ipv4"`
-	Release string   `json:"release"`
-}
-
-type MultipassListResponse struct {
-	List []MultipassListOutput `json:"list"`
-}
 
 // MultipassInfoOutput mirrors JSON from `multipass info --format=json`
 type MultipassInfoOutput struct {
@@ -92,6 +81,7 @@ type MultipassCollector struct {
 	instanceMemoryBytes *prometheus.Desc
 	timeout             time.Duration
 	executor            CommandExecutor
+	logger              *logrus.Logger
 }
 
 func NewMultipassCollector(timeoutSeconds int) *MultipassCollector {
@@ -99,6 +89,14 @@ func NewMultipassCollector(timeoutSeconds int) *MultipassCollector {
 }
 
 func NewMultipassCollectorWithExecutor(timeoutSeconds int, executor CommandExecutor) *MultipassCollector {
+	logger := logrus.New()
+	logger.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp:          true,
+		DisableLevelTruncation: true,
+		PadLevelText:           true,
+	})
+	logger.SetLevel(logrus.InfoLevel)
+
 	return &MultipassCollector{
 		instanceTotal: prometheus.NewDesc(
 			"multipass_instances_total",
@@ -132,7 +130,18 @@ func NewMultipassCollectorWithExecutor(timeoutSeconds int, executor CommandExecu
 		),
 		timeout:  time.Duration(timeoutSeconds) * time.Second,
 		executor: executor,
+		logger:   logger,
 	}
+}
+
+// SetLogLevel allows configuring the log level
+func (c *MultipassCollector) SetLogLevel(level string) error {
+	logrusLevel, err := logrus.ParseLevel(level)
+	if err != nil {
+		return fmt.Errorf("invalid log level: %w", err)
+	}
+	c.logger.SetLevel(logrusLevel)
+	return nil
 }
 
 // Describe sends metrics descriptions
@@ -147,29 +156,46 @@ func (c *MultipassCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect fetches instance count and sends to Prometheus
 func (c *MultipassCollector) Collect(ch chan<- prometheus.Metric) {
-	if err := c.collectInstanceTotal(ch); err != nil {
+	c.logger.Info("Starting metrics collection")
+
+	// Get multipass info once and reuse it
+	data, err := c.multipassInfo()
+	if err != nil {
+		c.logger.WithError(err).Error("Failed to get multipass info")
 		c.collectError(ch, err)
 		return
 	}
 
-	if err := c.collectInstanceRunning(ch); err != nil {
+	// Use cached data for all metrics
+	if err := c.collectInstanceTotalWithData(ch, data); err != nil {
+		c.logger.WithError(err).Error("Failed to collect instance total")
 		c.collectError(ch, err)
 		return
 	}
 
-	if err := c.collectInstanceStopped(ch); err != nil {
+	if err := c.collectInstanceRunningWithData(ch, data); err != nil {
+		c.logger.WithError(err).Error("Failed to collect instance running")
 		c.collectError(ch, err)
 		return
 	}
-	if err := c.collectInstanceDeleted(ch); err != nil {
+
+	if err := c.collectInstanceStoppedWithData(ch, data); err != nil {
+		c.logger.WithError(err).Error("Failed to collect instance stopped")
 		c.collectError(ch, err)
 		return
 	}
-	if err := c.collectInstanceSuspended(ch); err != nil {
+	if err := c.collectInstanceDeletedWithData(ch, data); err != nil {
+		c.logger.WithError(err).Error("Failed to collect instance deleted")
 		c.collectError(ch, err)
 		return
 	}
-	if err := c.collectInstanceMemoryBytes(ch); err != nil {
+	if err := c.collectInstanceSuspendedWithData(ch, data); err != nil {
+		c.logger.WithError(err).Error("Failed to collect instance suspended")
+		c.collectError(ch, err)
+		return
+	}
+	if err := c.collectInstanceMemoryBytesWithData(ch, data); err != nil {
+		c.logger.WithError(err).Error("Failed to collect instance memory bytes")
 		c.collectError(ch, err)
 		return
 	}
@@ -180,6 +206,18 @@ func (c *MultipassCollector) collectInstanceTotal(ch chan<- prometheus.Metric) e
 	if err != nil {
 		return err
 	}
+
+	ch <- prometheus.MustNewConstMetric(
+		c.instanceTotal,
+		prometheus.GaugeValue,
+		float64(count),
+	)
+	return nil
+}
+
+func (c *MultipassCollector) collectInstanceTotalWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse) error {
+	count := len(data.Info)
+	c.logger.WithField("count", count).Debug("Collecting instance total")
 
 	ch <- prometheus.MustNewConstMetric(
 		c.instanceTotal,
@@ -203,11 +241,35 @@ func (c *MultipassCollector) collectInstanceRunning(ch chan<- prometheus.Metric)
 	return nil
 }
 
+func (c *MultipassCollector) collectInstanceRunningWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse) error {
+	count := c.getInstanceCountByStateWithData(data, "Running")
+	c.logger.WithField("count", count).Debug("Collecting instance running")
+
+	ch <- prometheus.MustNewConstMetric(
+		c.instanceRunning,
+		prometheus.GaugeValue,
+		float64(count),
+	)
+	return nil
+}
+
 func (c *MultipassCollector) collectInstanceStopped(ch chan<- prometheus.Metric) error {
 	count, err := c.getInstanceCountByState("Stopped")
 	if err != nil {
 		return err
 	}
+
+	ch <- prometheus.MustNewConstMetric(
+		c.instanceStopped,
+		prometheus.GaugeValue,
+		float64(count),
+	)
+	return nil
+}
+
+func (c *MultipassCollector) collectInstanceStoppedWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse) error {
+	count := c.getInstanceCountByStateWithData(data, "Stopped")
+	c.logger.WithField("count", count).Debug("Collecting instance stopped")
 
 	ch <- prometheus.MustNewConstMetric(
 		c.instanceStopped,
@@ -231,6 +293,18 @@ func (c *MultipassCollector) collectInstanceDeleted(ch chan<- prometheus.Metric)
 	return nil
 }
 
+func (c *MultipassCollector) collectInstanceDeletedWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse) error {
+	count := c.getInstanceCountByStateWithData(data, "Deleted")
+	c.logger.WithField("count", count).Debug("Collecting instance deleted")
+
+	ch <- prometheus.MustNewConstMetric(
+		c.instanceDeleted,
+		prometheus.GaugeValue,
+		float64(count),
+	)
+	return nil
+}
+
 func (c *MultipassCollector) collectInstanceSuspended(ch chan<- prometheus.Metric) error {
 	count, err := c.getInstanceCountByState("Suspended")
 	if err != nil {
@@ -245,24 +319,43 @@ func (c *MultipassCollector) collectInstanceSuspended(ch chan<- prometheus.Metri
 	return nil
 }
 
-func (c *MultipassCollector) collectInstanceMemoryBytes(ch chan<- prometheus.Metric) error {
-	data, err := c.multipassInfo()
-	if err != nil {
-		return err
-	}
+func (c *MultipassCollector) collectInstanceSuspendedWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse) error {
+	count := c.getInstanceCountByStateWithData(data, "Suspended")
+	c.logger.WithField("count", count).Debug("Collecting instance suspended")
+
+	ch <- prometheus.MustNewConstMetric(
+		c.instanceSuspended,
+		prometheus.GaugeValue,
+		float64(count),
+	)
+	return nil
+}
+
+func (c *MultipassCollector) collectInstanceMemoryBytesWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse) error {
+	c.logger.WithField("instance_count", len(data.Info)).Info("Collecting memory metrics")
+	metricsCollected := 0
 
 	for name, info := range data.Info {
 		if info.Memory.Used == 0 {
+			c.logger.WithField("instance", name).Debug("Skipping instance - memory usage is 0")
 			continue
 		}
 
+		c.logger.WithFields(logrus.Fields{
+			"instance":     name,
+			"memory_bytes": info.Memory.Used,
+			"release":      info.Release,
+		}).Debug("Adding memory metric")
 		ch <- prometheus.MustNewConstMetric(
 			c.instanceMemoryBytes,
 			prometheus.GaugeValue,
 			float64(info.Memory.Used),
 			name, info.Release,
 		)
+		metricsCollected++
 	}
+
+	c.logger.WithField("metrics_collected", metricsCollected).Info("Successfully collected memory metrics")
 	return nil
 }
 
@@ -273,32 +366,8 @@ func (c *MultipassCollector) collectError(ch chan<- prometheus.Metric, err error
 	)
 }
 
-func (c *MultipassCollector) multipassList() (MultipassListResponse, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
-	defer cancel()
-
-	cmd := c.executor.CommandContext(ctx, "multipass", "list", "--format=json")
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return MultipassListResponse{}, fmt.Errorf("multipass list timed out after %v", c.timeout)
-		}
-		return MultipassListResponse{}, fmt.Errorf("multipass list failed: %w: %s", err, stderr.String())
-	}
-
-	var data MultipassListResponse
-
-	if err := json.Unmarshal(out.Bytes(), &data); err != nil {
-		return MultipassListResponse{}, fmt.Errorf("error parsing JSON: %w; stdout=%s; stderr=%s", err, out.String(), stderr.String())
-	}
-	return data, nil
-}
-
 func (c *MultipassCollector) multipassInfo() (MultipassInfoResponse, error) {
+	c.logger.Debug("Executing multipass info command")
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 
@@ -310,38 +379,53 @@ func (c *MultipassCollector) multipassInfo() (MultipassInfoResponse, error) {
 
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
+			c.logger.WithField("timeout", c.timeout).Error("multipass info command timed out")
 			return MultipassInfoResponse{}, fmt.Errorf("multipass info timed out after %v", c.timeout)
 		}
+		c.logger.WithError(err).WithField("stderr", stderr.String()).Error("multipass info command failed")
 		return MultipassInfoResponse{}, fmt.Errorf("multipass info failed: %w: %s", err, stderr.String())
 	}
 
 	var data MultipassInfoResponse
 
 	if err := json.Unmarshal(out.Bytes(), &data); err != nil {
+		c.logger.WithError(err).Error("Failed to parse multipass info JSON")
 		return MultipassInfoResponse{}, fmt.Errorf("error parsing JSON: %w; stdout=%s; stderr=%s", err, out.String(), stderr.String())
 	}
+
+	c.logger.WithField("instance_count", len(data.Info)).Info("Successfully parsed multipass info")
 	return data, nil
 }
 
 func (c *MultipassCollector) getInstanceCount() (int, error) {
-	data, err := c.multipassList()
+	data, err := c.multipassInfo()
 	if err != nil {
 		return 0, err
 	}
-	return len(data.List), nil
+	return len(data.Info), nil
 }
 
 func (c *MultipassCollector) getInstanceCountByState(state string) (int, error) {
-	data, err := c.multipassList()
+	data, err := c.multipassInfo()
 	if err != nil {
 		return 0, err
 	}
 	instanceCount := 0
-	for _, instance := range data.List {
+	for _, instance := range data.Info {
 		if instance.State == state {
 			instanceCount++
 		}
 	}
 
 	return instanceCount, nil
+}
+
+func (c *MultipassCollector) getInstanceCountByStateWithData(data MultipassInfoResponse, state string) int {
+	instanceCount := 0
+	for _, instance := range data.Info {
+		if instance.State == state {
+			instanceCount++
+		}
+	}
+	return instanceCount
 }
