@@ -138,8 +138,8 @@ Add the following to your `prometheus.yml`:
 scrape_configs:
   - job_name: 'multipass'
     static_configs:
-      - targets: ['localhost:9090']
-    scrape_interval: 30s
+      - targets: ['localhost:1986']
+    scrape_interval: 60s
 ```
 
 
