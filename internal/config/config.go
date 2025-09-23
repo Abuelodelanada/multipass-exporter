@@ -16,7 +16,8 @@ type Config struct {
 }
 
 // LoadConfig loads YAML file or returns defaults
-func LoadConfig(path string) (*Config, error) {
+// Returns a boolean indicating if the file was actually loaded
+func LoadConfig(path string) (*Config, bool, error) {
 	cfg := &Config{
 		Port:           1986,
 		MetricsPath:    "/metrics",
@@ -27,12 +28,12 @@ func LoadConfig(path string) (*Config, error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		// File missing? Use defaults
-		return cfg, nil
+		return cfg, false, nil
 	}
 
 	if err := yaml.Unmarshal(data, cfg); err != nil {
-		return nil, fmt.Errorf("error parsing YAML: %w", err)
+		return nil, false, fmt.Errorf("error parsing YAML: %w", err)
 	}
 
-	return cfg, nil
+	return cfg, true, nil
 }

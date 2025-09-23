@@ -32,9 +32,14 @@ func TestConfigValidation(t *testing.T) {
 
 func TestConfigDefaults(t *testing.T) {
 	// Test LoadConfig with non-existent file (should return defaults)
-	cfg, err := config.LoadConfig("/non/existent/file.yam")
+	cfg, loaded, err := config.LoadConfig("/non/existent/file.yam")
 	if err != nil {
 		t.Fatalf("Expected no error with non-existent file, got %v", err)
+	}
+
+	// Verify that file was not loaded
+	if loaded {
+		t.Error("Expected loaded to be false for non-existent file")
 	}
 
 	// Verify defaults

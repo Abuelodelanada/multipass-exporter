@@ -55,12 +55,18 @@ func (a *App) LoadConfiguration() error {
 			a.cfg.Port, a.cfg.MetricsPath, a.cfg.TimeoutSeconds, a.cfg.LogLevel)
 	} else {
 		// Load configuration from file
-		a.cfg, err = config.LoadConfig(a.configPath)
+		var loaded bool
+		a.cfg, loaded, err = config.LoadConfig(a.configPath)
 		if err != nil {
 			return fmt.Errorf("failed to load config from %s: %w", a.configPath, err)
 		}
-		log.Printf("Loaded configuration from %s: port=%d, metrics_path=%s, timeout_seconds=%d, log_level=%s",
-			a.configPath, a.cfg.Port, a.cfg.MetricsPath, a.cfg.TimeoutSeconds, a.cfg.LogLevel)
+		if loaded {
+			log.Printf("Loaded configuration from %s: port=%d, metrics_path=%s, timeout_seconds=%d, log_level=%s",
+				a.configPath, a.cfg.Port, a.cfg.MetricsPath, a.cfg.TimeoutSeconds, a.cfg.LogLevel)
+		} else {
+			log.Printf("Configuration file %s not found, using defaults: port=%d, metrics_path=%s, timeout_seconds=%d, log_level=%s",
+				a.configPath, a.cfg.Port, a.cfg.MetricsPath, a.cfg.TimeoutSeconds, a.cfg.LogLevel)
+		}
 	}
 
 	return nil

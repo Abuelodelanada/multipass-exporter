@@ -8,10 +8,14 @@ import (
 
 func TestLoadConfig_Defaults(t *testing.T) {
 	nonExistentPath := "/tmp/nonexistent_config.yaml"
-	cfg, err := LoadConfig(nonExistentPath)
+	cfg, loaded, err := LoadConfig(nonExistentPath)
 
 	if err != nil {
 		t.Fatalf("Expected no error for non-existent config file, got %v", err)
+	}
+
+	if loaded {
+		t.Error("Expected loaded to be false for non-existent file")
 	}
 
 	if cfg.Port != 1986 {
@@ -40,9 +44,13 @@ timeout_seconds: 10
 		t.Fatalf("Failed to create test config file: %v", err)
 	}
 
-	cfg, err := LoadConfig(tempFile)
+	cfg, loaded, err := LoadConfig(tempFile)
 	if err != nil {
 		t.Fatalf("Expected no error for valid config file, got %v", err)
+	}
+
+	if !loaded {
+		t.Error("Expected loaded to be true for existing file")
 	}
 
 	if cfg.Port != 9090 {
@@ -69,9 +77,13 @@ port: 3000
 		t.Fatalf("Failed to create test config file: %v", err)
 	}
 
-	cfg, err := LoadConfig(tempFile)
+	cfg, loaded, err := LoadConfig(tempFile)
 	if err != nil {
 		t.Fatalf("Expected no error for partial config file, got %v", err)
+	}
+
+	if !loaded {
+		t.Error("Expected loaded to be true for existing file")
 	}
 
 	if cfg.Port != 3000 {
@@ -101,9 +113,13 @@ invalid: yaml: content: [unclosed bracket
 		t.Fatalf("Failed to create test config file: %v", err)
 	}
 
-	_, err = LoadConfig(tempFile)
+	_, loaded, err := LoadConfig(tempFile)
 	if err == nil {
 		t.Fatal("Expected error for invalid YAML, got nil")
+	}
+
+	if loaded {
+		t.Error("Expected loaded to be false for invalid YAML")
 	}
 }
 
@@ -114,9 +130,13 @@ func TestLoadConfig_EmptyFile(t *testing.T) {
 		t.Fatalf("Failed to create test config file: %v", err)
 	}
 
-	cfg, err := LoadConfig(tempFile)
+	cfg, loaded, err := LoadConfig(tempFile)
 	if err != nil {
 		t.Fatalf("Expected no error for empty config file, got %v", err)
+	}
+
+	if !loaded {
+		t.Error("Expected loaded to be true for empty file (file exists)")
 	}
 
 	if cfg.Port != 1986 {
