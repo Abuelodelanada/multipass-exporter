@@ -1,7 +1,7 @@
 <center>
   <picture>
     <source srcset="images/logo.png?raw=true">
-    <img alt="Multipass Exporter" src="images/logo.png?raw=true" width="50%">
+    <img alt="Multipass Exporter" src="images/logo.png?raw=true" width="20%">
   </picture>
 </center>
 
