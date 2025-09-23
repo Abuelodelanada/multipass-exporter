@@ -14,7 +14,7 @@ func TestLoadConfig_Defaults(t *testing.T) {
 		t.Fatalf("Expected no error for non-existent config file, got %v", err)
 	}
 
-	if cfg.Port != 8080 {
+	if cfg.Port != 1986 {
 		t.Errorf("Expected default port 8080, got %d", cfg.Port)
 	}
 
@@ -119,8 +119,8 @@ func TestLoadConfig_EmptyFile(t *testing.T) {
 		t.Fatalf("Expected no error for empty config file, got %v", err)
 	}
 
-	if cfg.Port != 8080 {
-		t.Errorf("Expected default port 8080 for empty file, got %d", cfg.Port)
+	if cfg.Port != 1986 {
+		t.Errorf("Expected default port 1986 for empty file, got %d", cfg.Port)
 	}
 
 	if cfg.MetricsPath != "/metrics" {

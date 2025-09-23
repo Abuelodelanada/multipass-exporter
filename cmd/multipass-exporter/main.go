@@ -12,48 +12,102 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-func main() {
-	var configPath string
-	flag.StringVar(&configPath, "config", "", "Path to configuration file (optional)")
-	flag.Parse()
+// configPath is the command line argument for configuration file path
+var configPath string
 
-	var cfg *config.Config
+func main() {
+	app := NewApp()
+	app.Run()
+}
+
+// App represents the main application
+type App struct {
+	configPath string
+	cfg        *config.Config
+	collector  *collector.MultipassCollector
+}
+
+func NewApp() *App {
+	// Only parse flags if they haven't been parsed already
+	if !flag.Parsed() {
+		flag.StringVar(&configPath, "config", "", "Path to configuration file (optional)")
+		flag.Parse()
+	}
+
+	return &App{
+		configPath: configPath,
+	}
+}
+
+func NewAppWithConfig(configPath string) *App {
+	return &App{
+		configPath: configPath,
+	}
+}
+
+func (a *App) LoadConfiguration() error {
 	var err error
 
-	if configPath == "" {
+	if a.configPath == "" {
 		// Use default configuration
-		cfg = &config.Config{
-			Port:           8080,
+		a.cfg = &config.Config{
+			Port:           1986,
 			MetricsPath:    "/metrics",
 			TimeoutSeconds: 5,
 			LogLevel:       "info",
 		}
 		log.Printf("Using default configuration: port=%d, metrics_path=%s, timeout_seconds=%d, log_level=%s",
-			cfg.Port, cfg.MetricsPath, cfg.TimeoutSeconds, cfg.LogLevel)
+			a.cfg.Port, a.cfg.MetricsPath, a.cfg.TimeoutSeconds, a.cfg.LogLevel)
 	} else {
 		// Load configuration from file
-		cfg, err = config.LoadConfig(configPath)
+		a.cfg, err = config.LoadConfig(a.configPath)
 		if err != nil {
-			log.Fatalf("failed to load config from %s: %v", configPath, err)
+			return fmt.Errorf("failed to load config from %s: %w", a.configPath, err)
 		}
 		log.Printf("Loaded configuration from %s: port=%d, metrics_path=%s, timeout_seconds=%d, log_level=%s",
-			configPath, cfg.Port, cfg.MetricsPath, cfg.TimeoutSeconds, cfg.LogLevel)
+			a.configPath, a.cfg.Port, a.cfg.MetricsPath, a.cfg.TimeoutSeconds, a.cfg.LogLevel)
 	}
 
-	c := collector.NewMultipassCollector(cfg.TimeoutSeconds)
+	return nil
+}
 
-	// Configure log level from config file
-	if err := c.SetLogLevel(cfg.LogLevel); err != nil {
-		log.Printf("Warning: Invalid log level '%s', using info level: %v", cfg.LogLevel, err)
+func (a *App) InitializeCollector() error {
+	a.collector = collector.NewMultipassCollector(a.cfg.TimeoutSeconds)
+
+	if err := a.collector.SetLogLevel(a.cfg.LogLevel); err != nil {
+		log.Printf("Warning: Invalid log level '%s', using info level: %v", a.cfg.LogLevel, err)
 	}
 
-	prometheus.MustRegister(c)
+	prometheus.MustRegister(a.collector)
+	return nil
+}
 
-	addr := fmt.Sprintf(":%d", cfg.Port)
-	http.Handle(cfg.MetricsPath, promhttp.Handler())
+func (a *App) StartServer() error {
+	addr := fmt.Sprintf(":%d", a.cfg.Port)
+	http.Handle(a.cfg.MetricsPath, promhttp.Handler())
 
-	log.Printf("Multipass Exporter is running on %s%s", addr, cfg.MetricsPath)
-	if err := http.ListenAndServe(addr, nil); err != nil {
-		log.Fatalf("server failed: %v", err)
+	log.Printf("Multipass Exporter is running on %s%s", addr, a.cfg.MetricsPath)
+	return http.ListenAndServe(addr, nil)
+}
+
+func (a *App) Run() {
+	if err := a.LoadConfiguration(); err != nil {
+		log.Fatalf("Configuration error: %v", err)
 	}
+
+	if err := a.InitializeCollector(); err != nil {
+		log.Fatalf("Collector initialization error: %v", err)
+	}
+
+	if err := a.StartServer(); err != nil {
+		log.Fatalf("Server error: %v", err)
+	}
+}
+
+func (a *App) GetConfig() *config.Config {
+	return a.cfg
+}
+
+func (a *App) GetCollector() *collector.MultipassCollector {
+	return a.collector
 }

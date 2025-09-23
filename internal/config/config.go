@@ -18,7 +18,7 @@ type Config struct {
 // LoadConfig loads YAML file or returns defaults
 func LoadConfig(path string) (*Config, error) {
 	cfg := &Config{
-		Port:           8080,
+		Port:           1986,
 		MetricsPath:    "/metrics",
 		TimeoutSeconds: 5,
 		LogLevel:       "info",

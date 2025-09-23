@@ -489,6 +489,362 @@ func TestCollectInstanceMemoryBytes_WithError(t *testing.T) {
 }
 
 // Helper function
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[:len(s)-len(substr)+len(substr)] == substr
+func TestSetLogLevel(t *testing.T) {
+	collector := NewMultipassCollector(5)
+
+	// Test valid log levels
+	validLevels := []string{"debug", "info", "warn", "error", "fatal", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"}
+	for _, level := range validLevels {
+		err := collector.SetLogLevel(level)
+		if err != nil {
+			t.Errorf("Expected no error for level '%s', got %v", level, err)
+		}
+	}
+
+	// Test invalid log level
+	err := collector.SetLogLevel("invalid")
+	if err == nil {
+		t.Error("Expected error for invalid log level, got nil")
+	}
+}
+
+func TestCollectInstanceTotalWithData(t *testing.T) {
+	mockJSON := `{
+		"info": {
+			"test1": {"name": "test1", "state": "Running", "ipv4": [], "release": "22.04 LTS", "memory": {"total": 1073741824, "used": 536870912}},
+			"test2": {"name": "test2", "state": "Stopped", "ipv4": [], "release": "20.04 LTS", "memory": {"total": 1073741824, "used": 268435456}}
+		}
+	}`
+	mockExecutor := &MockCommandExecutor{output: mockJSON}
+	collector := NewMultipassCollectorWithExecutor(5, mockExecutor)
+
+	var data MultipassInfoResponse
+	if err := json.Unmarshal([]byte(mockJSON), &data); err != nil {
+		t.Fatalf("Failed to parse mock JSON: %v", err)
+	}
+
+	ch := make(chan prometheus.Metric, 1)
+	err := collector.collectInstanceTotalWithData(ch, data)
+
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	select {
+	case metric := <-ch:
+		pb := &dto.Metric{}
+		if err := metric.Write(pb); err != nil {
+			t.Fatalf("Failed to write metric: %v", err)
+		}
+		if *pb.Gauge.Value != 2 {
+			t.Errorf("Expected total count 2, got %f", *pb.Gauge.Value)
+		}
+	default:
+		t.Fatal("Expected metric to be sent to channel")
+	}
+}
+
+func TestCollectInstanceRunningWithData(t *testing.T) {
+	mockJSON := `{
+		"info": {
+			"test1": {"name": "test1", "state": "Running", "ipv4": [], "release": "22.04 LTS", "memory": {"total": 1073741824, "used": 536870912}},
+			"test2": {"name": "test2", "state": "Stopped", "ipv4": [], "release": "20.04 LTS", "memory": {"total": 1073741824, "used": 268435456}},
+			"test3": {"name": "test3", "state": "Running", "ipv4": [], "release": "22.04 LTS", "memory": {"total": 1073741824, "used": 536870912}}
+		}
+	}`
+	mockExecutor := &MockCommandExecutor{output: mockJSON}
+	collector := NewMultipassCollectorWithExecutor(5, mockExecutor)
+
+	var data MultipassInfoResponse
+	if err := json.Unmarshal([]byte(mockJSON), &data); err != nil {
+		t.Fatalf("Failed to parse mock JSON: %v", err)
+	}
+
+	ch := make(chan prometheus.Metric, 1)
+	err := collector.collectInstanceRunningWithData(ch, data)
+
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	select {
+	case metric := <-ch:
+		pb := &dto.Metric{}
+		if err := metric.Write(pb); err != nil {
+			t.Fatalf("Failed to write metric: %v", err)
+		}
+		if *pb.Gauge.Value != 2 {
+			t.Errorf("Expected running count 2, got %f", *pb.Gauge.Value)
+		}
+	default:
+		t.Fatal("Expected metric to be sent to channel")
+	}
+}
+
+func TestCollectInstanceStoppedWithData(t *testing.T) {
+	mockJSON := `{
+		"info": {
+			"test1": {"name": "test1", "state": "Running", "ipv4": [], "release": "22.04 LTS", "memory": {"total": 1073741824, "used": 536870912}},
+			"test2": {"name": "test2", "state": "Stopped", "ipv4": [], "release": "20.04 LTS", "memory": {"total": 1073741824, "used": 268435456}},
+			"test3": {"name": "test3", "state": "Stopped", "ipv4": [], "release": "22.04 LTS", "memory": {"total": 1073741824, "used": 536870912}}
+		}
+	}`
+	mockExecutor := &MockCommandExecutor{output: mockJSON}
+	collector := NewMultipassCollectorWithExecutor(5, mockExecutor)
+
+	var data MultipassInfoResponse
+	if err := json.Unmarshal([]byte(mockJSON), &data); err != nil {
+		t.Fatalf("Failed to parse mock JSON: %v", err)
+	}
+
+	ch := make(chan prometheus.Metric, 1)
+	err := collector.collectInstanceStoppedWithData(ch, data)
+
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	select {
+	case metric := <-ch:
+		pb := &dto.Metric{}
+		if err := metric.Write(pb); err != nil {
+			t.Fatalf("Failed to write metric: %v", err)
+		}
+		if *pb.Gauge.Value != 2 {
+			t.Errorf("Expected stopped count 2, got %f", *pb.Gauge.Value)
+		}
+	default:
+		t.Fatal("Expected metric to be sent to channel")
+	}
+}
+
+func TestCollectInstanceDeletedWithData(t *testing.T) {
+	mockJSON := `{
+		"info": {
+			"test1": {"name": "test1", "state": "Running", "ipv4": [], "release": "22.04 LTS", "memory": {"total": 1073741824, "used": 536870912}},
+			"test2": {"name": "test2", "state": "Deleted", "ipv4": [], "release": "20.04 LTS", "memory": {"total": 1073741824, "used": 268435456}},
+			"test3": {"name": "test3", "state": "Deleted", "ipv4": [], "release": "22.04 LTS", "memory": {"total": 1073741824, "used": 536870912}}
+		}
+	}`
+	mockExecutor := &MockCommandExecutor{output: mockJSON}
+	collector := NewMultipassCollectorWithExecutor(5, mockExecutor)
+
+	var data MultipassInfoResponse
+	if err := json.Unmarshal([]byte(mockJSON), &data); err != nil {
+		t.Fatalf("Failed to parse mock JSON: %v", err)
+	}
+
+	ch := make(chan prometheus.Metric, 1)
+	err := collector.collectInstanceDeletedWithData(ch, data)
+
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	select {
+	case metric := <-ch:
+		pb := &dto.Metric{}
+		if err := metric.Write(pb); err != nil {
+			t.Fatalf("Failed to write metric: %v", err)
+		}
+		if *pb.Gauge.Value != 2 {
+			t.Errorf("Expected deleted count 2, got %f", *pb.Gauge.Value)
+		}
+	default:
+		t.Fatal("Expected metric to be sent to channel")
+	}
+}
+
+func TestCollectInstanceSuspendedWithData(t *testing.T) {
+	mockJSON := `{
+		"info": {
+			"test1": {"name": "test1", "state": "Running", "ipv4": [], "release": "22.04 LTS", "memory": {"total": 1073741824, "used": 536870912}},
+			"test2": {"name": "test2", "state": "Suspended", "ipv4": [], "release": "20.04 LTS", "memory": {"total": 1073741824, "used": 268435456}},
+			"test3": {"name": "test3", "state": "Suspended", "ipv4": [], "release": "22.04 LTS", "memory": {"total": 1073741824, "used": 536870912}}
+		}
+	}`
+	mockExecutor := &MockCommandExecutor{output: mockJSON}
+	collector := NewMultipassCollectorWithExecutor(5, mockExecutor)
+
+	var data MultipassInfoResponse
+	if err := json.Unmarshal([]byte(mockJSON), &data); err != nil {
+		t.Fatalf("Failed to parse mock JSON: %v", err)
+	}
+
+	ch := make(chan prometheus.Metric, 1)
+	err := collector.collectInstanceSuspendedWithData(ch, data)
+
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	select {
+	case metric := <-ch:
+		pb := &dto.Metric{}
+		if err := metric.Write(pb); err != nil {
+			t.Fatalf("Failed to write metric: %v", err)
+		}
+		if *pb.Gauge.Value != 2 {
+			t.Errorf("Expected suspended count 2, got %f", *pb.Gauge.Value)
+		}
+	default:
+		t.Fatal("Expected metric to be sent to channel")
+	}
+}
+
+func TestCollectMain(t *testing.T) {
+	mockJSON := `{
+		"info": {
+			"test1": {"name": "test1", "state": "Running", "ipv4": [], "release": "22.04 LTS", "memory": {"total": 1073741824, "used": 536870912}},
+			"test2": {"name": "test2", "state": "Stopped", "ipv4": [], "release": "20.04 LTS", "memory": {"total": 1073741824, "used": 268435456}}
+		}
+	}`
+	mockExecutor := &MockCommandExecutor{output: mockJSON}
+	collector := NewMultipassCollectorWithExecutor(5, mockExecutor)
+
+	ch := make(chan prometheus.Metric, 10)
+	collector.Collect(ch)
+
+	close(ch)
+
+	metricsCount := 0
+	for range ch {
+		metricsCount++
+	}
+
+	// Should collect: total, running, stopped, deleted, suspended, memory metrics, and potentially error
+	if metricsCount < 6 {
+		t.Errorf("Expected at least 6 metrics, got %d", metricsCount)
+	}
+}
+
+func TestCollectInstanceDeleted(t *testing.T) {
+	mockJSON := `{
+		"info": {
+			"test1": {"name": "test1", "state": "Deleted", "ipv4": [], "release": "22.04 LTS", "memory": {"total": 1073741824, "used": 536870912}},
+			"test2": {"name": "test2", "state": "Running", "ipv4": [], "release": "20.04 LTS", "memory": {"total": 1073741824, "used": 268435456}}
+		}
+	}`
+	mockExecutor := &MockCommandExecutor{output: mockJSON}
+	collector := NewMultipassCollectorWithExecutor(5, mockExecutor)
+
+	ch := make(chan prometheus.Metric, 1)
+	err := collector.collectInstanceDeleted(ch)
+
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	select {
+	case metric := <-ch:
+		pb := &dto.Metric{}
+		if err := metric.Write(pb); err != nil {
+			t.Fatalf("Failed to write metric: %v", err)
+		}
+		if *pb.Gauge.Value != 1 {
+			t.Errorf("Expected deleted count 1, got %f", *pb.Gauge.Value)
+		}
+	default:
+		t.Fatal("Expected metric to be sent to channel")
+	}
+}
+
+func TestCollectInstanceSuspended(t *testing.T) {
+	mockJSON := `{
+		"info": {
+			"test1": {"name": "test1", "state": "Suspended", "ipv4": [], "release": "22.04 LTS", "memory": {"total": 1073741824, "used": 536870912}},
+			"test2": {"name": "test2", "state": "Running", "ipv4": [], "release": "20.04 LTS", "memory": {"total": 1073741824, "used": 268435456}}
+		}
+	}`
+	mockExecutor := &MockCommandExecutor{output: mockJSON}
+	collector := NewMultipassCollectorWithExecutor(5, mockExecutor)
+
+	ch := make(chan prometheus.Metric, 1)
+	err := collector.collectInstanceSuspended(ch)
+
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	select {
+	case metric := <-ch:
+		pb := &dto.Metric{}
+		if err := metric.Write(pb); err != nil {
+			t.Fatalf("Failed to write metric: %v", err)
+		}
+		if *pb.Gauge.Value != 1 {
+			t.Errorf("Expected suspended count 1, got %f", *pb.Gauge.Value)
+		}
+	default:
+		t.Fatal("Expected metric to be sent to channel")
+	}
+}
+
+func TestGetInstanceCountByStateWithData(t *testing.T) {
+	data := MultipassInfoResponse{
+		Info: map[string]MultipassInfoOutput{
+			"instance1": {State: "Running"},
+			"instance2": {State: "Running"},
+			"instance3": {State: "Stopped"},
+			"instance4": {State: "Running"},
+		},
+	}
+
+	collector := NewMultipassCollector(5)
+
+	runningCount := collector.getInstanceCountByStateWithData(data, "Running")
+	stoppedCount := collector.getInstanceCountByStateWithData(data, "Stopped")
+	deletedCount := collector.getInstanceCountByStateWithData(data, "Deleted")
+
+	if runningCount != 3 {
+		t.Errorf("Expected 3 running instances, got %d", runningCount)
+	}
+	if stoppedCount != 1 {
+		t.Errorf("Expected 1 stopped instance, got %d", stoppedCount)
+	}
+	if deletedCount != 0 {
+		t.Errorf("Expected 0 deleted instances, got %d", deletedCount)
+	}
+}
+
+func TestCollectInstanceMemoryBytesWithDataEdgeCases(t *testing.T) {
+	collector := NewMultipassCollector(5)
+
+	// Test with no instances
+	emptyData := MultipassInfoResponse{Info: make(map[string]MultipassInfoOutput)}
+	ch := make(chan prometheus.Metric, 1)
+	err := collector.collectInstanceMemoryBytesWithData(ch, emptyData)
+
+	if err != nil {
+		t.Fatalf("Expected no error with empty data, got %v", err)
+	}
+
+	// Test with instances having zero memory usage
+	zeroMemoryData := MultipassInfoResponse{
+		Info: map[string]MultipassInfoOutput{
+			"instance1": {
+				Name:  "instance1",
+				State: "Running",
+				Memory: MemoryInfo{
+					Total: 1073741824,
+					Used:  0,
+				},
+			},
+		},
+	}
+
+	ch = make(chan prometheus.Metric, 1)
+	err = collector.collectInstanceMemoryBytesWithData(ch, zeroMemoryData)
+
+	if err != nil {
+		t.Fatalf("Expected no error with zero memory usage, got %v", err)
+	}
+
+	// Verify no metrics were sent (since memory usage is 0)
+	select {
+	case <-ch:
+		t.Fatal("Expected no metrics when memory usage is 0")
+	default:
+		// Expected behavior
+	}
 }
