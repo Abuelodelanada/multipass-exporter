@@ -159,7 +159,7 @@ GOARCH=arm64 go build -o multipass-exporter-arm64 ./cmd/multipass-exporter
 ### Testing
 
 ```bash
-go test ./...
+make test
 ```
 
 ### Running Locally
