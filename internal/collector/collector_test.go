@@ -109,11 +109,6 @@ func TestMultipassInfo_Success(t *testing.T) {
 	}
 }
 
-
-
-
-
-
 func TestCollectError(t *testing.T) {
 	collector := NewMultipassCollectorWithExecutor(5, &MockCommandExecutor{})
 	ch := make(chan prometheus.Metric, 1)
@@ -401,7 +396,8 @@ func TestCollectInstanceTotalWithData(t *testing.T) {
 	}
 
 	ch := make(chan prometheus.Metric, 1)
-	err := collector.collectInstanceTotalWithData(ch, data)
+	metricConfig := instanceMetric{name: "total", state: "", desc: collector.instanceTotal}
+	err := collector.collectInstanceMetric(ch, data, metricConfig)
 
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
@@ -438,7 +434,8 @@ func TestCollectInstanceRunningWithData(t *testing.T) {
 	}
 
 	ch := make(chan prometheus.Metric, 1)
-	err := collector.collectInstanceRunningWithData(ch, data)
+	metricConfig := instanceMetric{name: "running", state: "Running", desc: collector.instanceRunning}
+	err := collector.collectInstanceMetric(ch, data, metricConfig)
 
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
@@ -475,7 +472,8 @@ func TestCollectInstanceStoppedWithData(t *testing.T) {
 	}
 
 	ch := make(chan prometheus.Metric, 1)
-	err := collector.collectInstanceStoppedWithData(ch, data)
+	metricConfig := instanceMetric{name: "stopped", state: "Stopped", desc: collector.instanceStopped}
+	err := collector.collectInstanceMetric(ch, data, metricConfig)
 
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
@@ -512,7 +510,8 @@ func TestCollectInstanceDeletedWithData(t *testing.T) {
 	}
 
 	ch := make(chan prometheus.Metric, 1)
-	err := collector.collectInstanceDeletedWithData(ch, data)
+	metricConfig := instanceMetric{name: "deleted", state: "Deleted", desc: collector.instanceDeleted}
+	err := collector.collectInstanceMetric(ch, data, metricConfig)
 
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
@@ -549,7 +548,8 @@ func TestCollectInstanceSuspendedWithData(t *testing.T) {
 	}
 
 	ch := make(chan prometheus.Metric, 1)
-	err := collector.collectInstanceSuspendedWithData(ch, data)
+	metricConfig := instanceMetric{name: "suspended", state: "Suspended", desc: collector.instanceSuspended}
+	err := collector.collectInstanceMetric(ch, data, metricConfig)
 
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
@@ -594,8 +594,6 @@ func TestCollectMain(t *testing.T) {
 		t.Errorf("Expected at least 6 metrics, got %d", metricsCount)
 	}
 }
-
-
 
 func TestGetInstanceCountByStateWithData(t *testing.T) {
 	data := MultipassInfoResponse{

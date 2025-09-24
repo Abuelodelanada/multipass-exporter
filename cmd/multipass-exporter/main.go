@@ -99,4 +99,3 @@ func (a *App) Run() {
 		log.Fatalf("Server error: %v", err)
 	}
 }
-

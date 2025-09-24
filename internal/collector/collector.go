@@ -84,6 +84,12 @@ type MultipassCollector struct {
 	logger              *logrus.Logger
 }
 
+type instanceMetric struct {
+	name  string
+	state string
+	desc  *prometheus.Desc
+}
+
 func NewMultipassCollector(timeoutSeconds int) *MultipassCollector {
 	return NewMultipassCollectorWithExecutor(timeoutSeconds, RealCommandExecutor{})
 }
@@ -166,34 +172,22 @@ func (c *MultipassCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	// Use cached data for all metrics
-	if err := c.collectInstanceTotalWithData(ch, data); err != nil {
-		c.logger.WithError(err).Error("Failed to collect instance total")
-		c.collectError(ch, err)
-		return
+	instanceMetrics := []instanceMetric{
+		{"total", "", c.instanceTotal},
+		{"running", "Running", c.instanceRunning},
+		{"stopped", "Stopped", c.instanceStopped},
+		{"deleted", "Deleted", c.instanceDeleted},
+		{"suspended", "Suspended", c.instanceSuspended},
 	}
 
-	if err := c.collectInstanceRunningWithData(ch, data); err != nil {
-		c.logger.WithError(err).Error("Failed to collect instance running")
-		c.collectError(ch, err)
-		return
+	for _, metric := range instanceMetrics {
+		if err := c.collectInstanceMetric(ch, data, metric); err != nil {
+			c.logger.WithError(err).Errorf("Failed to collect instance %s", metric.name)
+			c.collectError(ch, err)
+			return
+		}
 	}
 
-	if err := c.collectInstanceStoppedWithData(ch, data); err != nil {
-		c.logger.WithError(err).Error("Failed to collect instance stopped")
-		c.collectError(ch, err)
-		return
-	}
-	if err := c.collectInstanceDeletedWithData(ch, data); err != nil {
-		c.logger.WithError(err).Error("Failed to collect instance deleted")
-		c.collectError(ch, err)
-		return
-	}
-	if err := c.collectInstanceSuspendedWithData(ch, data); err != nil {
-		c.logger.WithError(err).Error("Failed to collect instance suspended")
-		c.collectError(ch, err)
-		return
-	}
 	if err := c.collectInstanceMemoryBytesWithData(ch, data); err != nil {
 		c.logger.WithError(err).Error("Failed to collect instance memory bytes")
 		c.collectError(ch, err)
@@ -201,63 +195,28 @@ func (c *MultipassCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (c *MultipassCollector) collectInstanceTotalWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse) error {
-	count := len(data.Info)
-	c.logger.WithField("count", count).Debug("Collecting instance total")
+func (c *MultipassCollector) collectInstanceMetric(ch chan<- prometheus.Metric, data MultipassInfoResponse, metric instanceMetric) error {
+	var count int
+
+	if metric.state == "" {
+		// Special case: total instances
+		count = len(data.Info)
+	} else {
+		// Count instances by state
+		count = c.getInstanceCountByStateWithData(data, metric.state)
+	}
+
+	c.logger.WithFields(logrus.Fields{
+		"metric": metric.name,
+		"count":  count,
+	}).Debug("Collecting instance metric")
 
 	ch <- prometheus.MustNewConstMetric(
-		c.instanceTotal,
+		metric.desc,
 		prometheus.GaugeValue,
 		float64(count),
 	)
-	return nil
-}
 
-func (c *MultipassCollector) collectInstanceRunningWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse) error {
-	count := c.getInstanceCountByStateWithData(data, "Running")
-	c.logger.WithField("count", count).Debug("Collecting instance running")
-
-	ch <- prometheus.MustNewConstMetric(
-		c.instanceRunning,
-		prometheus.GaugeValue,
-		float64(count),
-	)
-	return nil
-}
-
-func (c *MultipassCollector) collectInstanceStoppedWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse) error {
-	count := c.getInstanceCountByStateWithData(data, "Stopped")
-	c.logger.WithField("count", count).Debug("Collecting instance stopped")
-
-	ch <- prometheus.MustNewConstMetric(
-		c.instanceStopped,
-		prometheus.GaugeValue,
-		float64(count),
-	)
-	return nil
-}
-
-func (c *MultipassCollector) collectInstanceDeletedWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse) error {
-	count := c.getInstanceCountByStateWithData(data, "Deleted")
-	c.logger.WithField("count", count).Debug("Collecting instance deleted")
-
-	ch <- prometheus.MustNewConstMetric(
-		c.instanceDeleted,
-		prometheus.GaugeValue,
-		float64(count),
-	)
-	return nil
-}
-
-func (c *MultipassCollector) collectInstanceSuspendedWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse) error {
-	count := c.getInstanceCountByStateWithData(data, "Suspended")
-	c.logger.WithField("count", count).Debug("Collecting instance suspended")
-
-	ch <- prometheus.MustNewConstMetric(
-		c.instanceSuspended,
-		prometheus.GaugeValue,
-		float64(count),
-	)
 	return nil
 }
 
