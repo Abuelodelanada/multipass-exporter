@@ -100,10 +100,3 @@ func (a *App) Run() {
 	}
 }
 
-func (a *App) GetConfig() *config.Config {
-	return a.cfg
-}
-
-func (a *App) GetCollector() *collector.MultipassCollector {
-	return a.collector
-}

@@ -201,40 +201,12 @@ func (c *MultipassCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (c *MultipassCollector) collectInstanceTotal(ch chan<- prometheus.Metric) error {
-	count, err := c.getInstanceCount()
-	if err != nil {
-		return err
-	}
-
-	ch <- prometheus.MustNewConstMetric(
-		c.instanceTotal,
-		prometheus.GaugeValue,
-		float64(count),
-	)
-	return nil
-}
-
 func (c *MultipassCollector) collectInstanceTotalWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse) error {
 	count := len(data.Info)
 	c.logger.WithField("count", count).Debug("Collecting instance total")
 
 	ch <- prometheus.MustNewConstMetric(
 		c.instanceTotal,
-		prometheus.GaugeValue,
-		float64(count),
-	)
-	return nil
-}
-
-func (c *MultipassCollector) collectInstanceRunning(ch chan<- prometheus.Metric) error {
-	count, err := c.getInstanceCountByState("Running")
-	if err != nil {
-		return err
-	}
-
-	ch <- prometheus.MustNewConstMetric(
-		c.instanceRunning,
 		prometheus.GaugeValue,
 		float64(count),
 	)
@@ -253,20 +225,6 @@ func (c *MultipassCollector) collectInstanceRunningWithData(ch chan<- prometheus
 	return nil
 }
 
-func (c *MultipassCollector) collectInstanceStopped(ch chan<- prometheus.Metric) error {
-	count, err := c.getInstanceCountByState("Stopped")
-	if err != nil {
-		return err
-	}
-
-	ch <- prometheus.MustNewConstMetric(
-		c.instanceStopped,
-		prometheus.GaugeValue,
-		float64(count),
-	)
-	return nil
-}
-
 func (c *MultipassCollector) collectInstanceStoppedWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse) error {
 	count := c.getInstanceCountByStateWithData(data, "Stopped")
 	c.logger.WithField("count", count).Debug("Collecting instance stopped")
@@ -279,40 +237,12 @@ func (c *MultipassCollector) collectInstanceStoppedWithData(ch chan<- prometheus
 	return nil
 }
 
-func (c *MultipassCollector) collectInstanceDeleted(ch chan<- prometheus.Metric) error {
-	count, err := c.getInstanceCountByState("Deleted")
-	if err != nil {
-		return err
-	}
-
-	ch <- prometheus.MustNewConstMetric(
-		c.instanceDeleted,
-		prometheus.GaugeValue,
-		float64(count),
-	)
-	return nil
-}
-
 func (c *MultipassCollector) collectInstanceDeletedWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse) error {
 	count := c.getInstanceCountByStateWithData(data, "Deleted")
 	c.logger.WithField("count", count).Debug("Collecting instance deleted")
 
 	ch <- prometheus.MustNewConstMetric(
 		c.instanceDeleted,
-		prometheus.GaugeValue,
-		float64(count),
-	)
-	return nil
-}
-
-func (c *MultipassCollector) collectInstanceSuspended(ch chan<- prometheus.Metric) error {
-	count, err := c.getInstanceCountByState("Suspended")
-	if err != nil {
-		return err
-	}
-
-	ch <- prometheus.MustNewConstMetric(
-		c.instanceSuspended,
 		prometheus.GaugeValue,
 		float64(count),
 	)
@@ -395,29 +325,6 @@ func (c *MultipassCollector) multipassInfo() (MultipassInfoResponse, error) {
 
 	c.logger.WithField("instance_count", len(data.Info)).Info("Successfully parsed multipass info")
 	return data, nil
-}
-
-func (c *MultipassCollector) getInstanceCount() (int, error) {
-	data, err := c.multipassInfo()
-	if err != nil {
-		return 0, err
-	}
-	return len(data.Info), nil
-}
-
-func (c *MultipassCollector) getInstanceCountByState(state string) (int, error) {
-	data, err := c.multipassInfo()
-	if err != nil {
-		return 0, err
-	}
-	instanceCount := 0
-	for _, instance := range data.Info {
-		if instance.State == state {
-			instanceCount++
-		}
-	}
-
-	return instanceCount, nil
 }
 
 func (c *MultipassCollector) getInstanceCountByStateWithData(data MultipassInfoResponse, state string) int {

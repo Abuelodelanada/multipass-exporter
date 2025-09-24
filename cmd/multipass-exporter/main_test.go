@@ -139,7 +139,7 @@ func TestAppLoadConfiguration(t *testing.T) {
 		t.Errorf("LoadConfiguration failed: %v", err)
 	}
 
-	cfg := app.GetConfig()
+	cfg := app.cfg
 	if cfg.Port != 1986 {
 		t.Errorf("Expected default port 1986, got %d", cfg.Port)
 	}
@@ -183,7 +183,7 @@ log_level: "debug"
 		t.Errorf("LoadConfiguration failed: %v", err)
 	}
 
-	cfg := app.GetConfig()
+	cfg := app.cfg
 	if cfg.Port != 9090 {
 		t.Errorf("Expected port 9090, got %d", cfg.Port)
 	}
@@ -206,7 +206,7 @@ func TestAppLoadConfigurationInvalidFile(t *testing.T) {
 		t.Errorf("LoadConfiguration should not fail with invalid file, got: %v", err)
 	}
 
-	cfg := app.GetConfig()
+	cfg := app.cfg
 	// Should use default values when file doesn't exist
 	if cfg.Port != 1986 {
 		t.Errorf("Expected default port 1986 when file doesn't exist, got %d", cfg.Port)
@@ -231,7 +231,7 @@ func TestAppInitializeCollector(t *testing.T) {
 		t.Errorf("InitializeCollector failed: %v", err)
 	}
 
-	collector := app.GetCollector()
+	collector := app.collector
 	if collector == nil {
 		t.Error("Expected collector to be initialized")
 	}
