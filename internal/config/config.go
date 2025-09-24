@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"gopkg.in/yaml.v3"
+	"gopkg.in/yaml.v3" //nolint:typecheck
 )
 
 // Config holds exporter settings
