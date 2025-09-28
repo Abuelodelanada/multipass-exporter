@@ -31,3 +31,5 @@ apps:
     command: bin/multipass-exporter
     plugs:
       - network-bind
+    environment:
+      PATH: /snap/bin:$SNAP/usr/bin:$SNAP/bin
