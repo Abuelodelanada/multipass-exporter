@@ -36,7 +36,7 @@ func LoadConfig(path string) (*Config, bool, error) {
 		return cfg, false, nil
 	}
 
-	if err := yaml.Unmarshal(data, cfg); err != nil {
+	if err := yaml.Unmarshal(data, cfg); err != nil { //nolint:typecheck
 		return nil, false, fmt.Errorf("error parsing YAML: %w", err)
 	}
 

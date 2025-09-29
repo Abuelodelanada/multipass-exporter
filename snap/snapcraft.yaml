@@ -1,0 +1,35 @@
+name: multipass-exporter
+adopt-info: multipass-exporter
+title: Multipass Exporter
+summary: A Prometheus exporter for Multipass.
+description: |
+  This exporter provides metrics about Multipass virtual machines, making it easy to monitor your local development environment with Prometheus.
+
+contact: jose.masson@gmail.com
+website: https://github.com/Abuelodelanada/multipass-exporter
+source-code: https://github.com/Abuelodelanada/multipass-exporter
+issues: https://github.com/Abuelodelanada/multipass-exporter/issues
+license: GPL-3.0
+confinement: strict
+base: core24
+
+parts:
+  multipass-exporter:
+    source: .
+    plugin: make
+    build-packages:
+      - git
+    build-snaps:
+      - go/1.23/stable
+    override-build: |
+      craftctl set version="$(git describe --tags --abbrev=0 | sed 's/^v//')"
+      make build
+      install -D multipass-exporter $CRAFT_PART_INSTALL/bin/multipass-exporter
+
+apps:
+  multipass-exporter:
+    command: bin/multipass-exporter
+    plugs:
+      - network-bind
+    environment:
+      PATH: /snap/bin:$SNAP/usr/bin:$SNAP/bin
