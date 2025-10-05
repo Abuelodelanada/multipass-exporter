@@ -2,7 +2,7 @@ package config
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"gopkg.in/yaml.v3" //nolint:typecheck
 )
@@ -30,7 +30,7 @@ func DefaultConfig() *Config {
 func LoadConfig(path string) (*Config, bool, error) {
 	cfg := DefaultConfig()
 
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		// File missing? Use defaults
 		return cfg, false, nil
