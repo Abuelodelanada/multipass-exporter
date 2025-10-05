@@ -47,7 +47,8 @@ func (f *FailingCommandExecutor) CommandContext(ctx context.Context, name string
 	cmd := exec.CommandContext(ctx, "false")
 	if f.stderr != "" {
 		// We can't easily mock stderr with the current approach
-		// but we can simulate failure
+		// TODO: Implement proper stderr mocking if needed
+		_ = f.stderr // Suppress unused variable warning
 	}
 	return cmd
 }
@@ -342,6 +343,11 @@ func TestCollectInstanceMemoryBytes_WithMock(t *testing.T) {
 	}
 	if values[0] != 268435456 && values[1] != 268435456 {
 		t.Errorf("Expected one metric to be 268435456 (256MB), but got %f and %f", values[0], values[1])
+	}
+
+	// Verify names and releases were collected (use the variables to avoid SA4010)
+	if len(names) != 2 || len(releases) != 2 {
+		t.Errorf("Expected 2 names and 2 releases, got %d names and %d releases", len(names), len(releases))
 	}
 }
 
