@@ -184,6 +184,16 @@ GOARCH=amd64 go build -o multipass-exporter-amd64 ./cmd/multipass-exporter
 GOARCH=arm64 go build -o multipass-exporter-arm64 ./cmd/multipass-exporter
 ```
 
+### Linting
+
+```bash
+# Run full linter (auto-installs golangci-lint if needed)
+make lint
+
+# Run fast linting mode
+make lint-fast
+```
+
 ### Testing
 
 ```bash

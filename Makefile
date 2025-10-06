@@ -31,7 +31,7 @@ lint:
 		go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59.1; \
 	fi
 	@echo "Running golangci-lint..."
-	@golangci-lint run --timeout=5m
+	@golangci-lint run --timeout=2m --max-same-issues=10 --max-issues-per-linter=20
 
 lint-fast:
 	@if ! command -v golangci-lint >/dev/null 2>&1; then \
