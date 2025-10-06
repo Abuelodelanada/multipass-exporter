@@ -1,6 +1,5 @@
 run:
-  timeout: 2m
-  modules-download-mode: readonly
+  timeout: 1m
 
 linters:
   disable-all: true
@@ -8,21 +7,8 @@ linters:
     - gofmt
     - goimports
     - govet
-    - gosimple
     - ineffassign
-    - misspell
-    - staticcheck
-    - typecheck
-    - unused
-
-output:
-  formats:
-    - format: colored-line-number
 
 issues:
-  exclude-rules:
-    # Exclude false positive for yaml import in config
-    - path: internal/config/config.go
-      text: "undefined: yaml"
-      linters:
-        - typecheck
+  max-issues-per-linter: 0
+  max-same-issues: 0

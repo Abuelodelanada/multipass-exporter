@@ -37,7 +37,7 @@ jobs:
 
     - name: Run linter
       run: |
-        make lint-fast
+        make lint-ci
 
     - name: Run test coverage
       run: |
