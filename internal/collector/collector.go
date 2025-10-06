@@ -79,6 +79,7 @@ type MultipassCollector struct {
 	instanceDeleted     *prometheus.Desc
 	instanceSuspended   *prometheus.Desc
 	instanceMemoryBytes *prometheus.Desc
+	instanceCPUTotal    *prometheus.Desc
 	timeout             time.Duration
 	executor            CommandExecutor
 	logger              *logrus.Logger
@@ -134,6 +135,11 @@ func NewMultipassCollectorWithExecutor(timeoutSeconds int, executor CommandExecu
 			"Memory usage of Multipass instances in bytes",
 			[]string{"name", "release"}, nil,
 		),
+		instanceCPUTotal: prometheus.NewDesc(
+			"multipass_instance_cpu_total",
+			"Total number of CPUs  in Multipass instances",
+			[]string{"name", "release"}, nil,
+		),
 		timeout:  time.Duration(timeoutSeconds) * time.Second,
 		executor: executor,
 		logger:   logger,
@@ -158,6 +164,7 @@ func (c *MultipassCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.instanceDeleted
 	ch <- c.instanceSuspended
 	ch <- c.instanceMemoryBytes
+	ch <- c.instanceCPUTotal
 }
 
 // Collect fetches instance count and sends to Prometheus
@@ -190,6 +197,12 @@ func (c *MultipassCollector) Collect(ch chan<- prometheus.Metric) {
 
 	if err := c.collectInstanceMemoryBytesWithData(ch, data); err != nil {
 		c.logger.WithError(err).Error("Failed to collect instance memory bytes")
+		c.collectError(ch, err)
+		return
+	}
+
+	if err := c.collectInstanceCPUTotalWithData(ch, data); err != nil {
+		c.logger.WithError(err).Error("Failed to collect instance CPUs")
 		c.collectError(ch, err)
 		return
 	}
@@ -245,6 +258,39 @@ func (c *MultipassCollector) collectInstanceMemoryBytesWithData(ch chan<- promet
 	}
 
 	c.logger.WithField("metrics_collected", metricsCollected).Info("Successfully collected memory metrics")
+	return nil
+}
+
+func (c *MultipassCollector) collectInstanceCPUTotalWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse) error {
+	c.logger.WithField("instance_count", len(data.Info)).Info("Collecting CPU metrics")
+	metricsCollected := 0
+
+	for name, info := range data.Info {
+		if info.CPUCount == "" {
+			c.logger.WithField("instance", name).Debug("Skipping instance - CPU count is 0 or empty")
+			continue
+		}
+
+		var cpuCount int
+		_, err := fmt.Sscanf(info.CPUCount, "%d", &cpuCount)
+		if err != nil {
+			c.logger.WithError(err).WithField("instance", name).Error("Failed to parse CPU count")
+			continue
+		}
+		c.logger.WithFields(logrus.Fields{
+			"instance":  name,
+			"cpu_count": cpuCount,
+		}).Debug("Adding CPU metric")
+		ch <- prometheus.MustNewConstMetric(
+			c.instanceCPUTotal,
+			prometheus.GaugeValue,
+			float64(cpuCount),
+			name, info.Release,
+		)
+		metricsCollected++
+	}
+
+	c.logger.WithField("metrics_collected", metricsCollected).Info("Successfully collected CPU metrics")
 	return nil
 }
 
