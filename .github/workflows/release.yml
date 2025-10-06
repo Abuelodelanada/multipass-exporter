@@ -1,0 +1,118 @@
+name: Auto Release
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Get next version
+      id: version
+      run: |
+        # Get the latest tag
+        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+        echo "Latest tag: $LATEST_TAG"
+
+        # Extract version number (remove 'v' prefix)
+        VERSION_NUMBER=${LATEST_TAG#v}
+
+        # Increment version (patch)
+        IFS='.' read -ra VERSION_PARTS <<< "$VERSION_NUMBER"
+        MAJOR=${VERSION_PARTS[0]}
+        MINOR=${VERSION_PARTS[1]}
+        PATCH=${VERSION_PARTS[2]}
+
+        NEW_PATCH=$((PATCH + 1))
+        NEW_VERSION="v$MAJOR.$MINOR.$NEW_PATCH"
+
+        echo "New version: $NEW_VERSION"
+        echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+        # Check if this is a merge from a PR
+        if [ "${{ github.event_name }}" = "push" ]; then
+          # Get commit message of the latest commit
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+
+          # Check if it's a merge commit
+          if echo "$COMMIT_MSG" | grep -q "Merge pull request"; then
+            echo "is_merge=true" >> $GITHUB_OUTPUT
+            echo "This is a PR merge, creating release"
+          else
+            echo "is_merge=false" >> $GITHUB_OUTPUT
+            echo "This is a direct push, skipping release"
+          fi
+        else
+          echo "is_merge=true" >> $GITHUB_OUTPUT
+          echo "Manual workflow run, creating release"
+        fi
+
+    - name: Setup Go
+      if: steps.version.outputs.is_merge == 'true'
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Run tests
+      if: steps.version.outputs.is_merge == 'true'
+      run: |
+        make test
+        make lint
+
+    - name: Build binaries
+      if: steps.version.outputs.is_merge == 'true'
+      run: |
+        make build-all
+
+    - name: Create and push tag
+      if: steps.version.outputs.is_merge == 'true'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git tag -a ${{ steps.version.outputs.version }} -m "Release ${{ steps.version.outputs.version }}"
+        git push origin ${{ steps.version.outputs.version }}
+
+    - name: Create Release
+      if: steps.version.outputs.is_merge == 'true'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.version.outputs.version }}
+        name: Release ${{ steps.version.outputs.version }}
+        body: |
+          ## Release ${{ steps.version.outputs.version }}
+
+          This is an automated release created from a merge to main.
+
+          ### Changes
+          - View merged pull requests since last release
+
+          ### Binaries
+          - `multipass-exporter-linux-amd64` - For AMD64 Linux systems
+          - `multipass-exporter-linux-arm64` - For ARM64 Linux systems
+
+          ### Installation
+          ```bash
+          # Download the appropriate binary for your architecture
+          wget https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/multipass-exporter-linux-amd64
+          chmod +x multipass-exporter-linux-amd64
+          ./multipass-exporter-linux-amd64
+          ```
+        files: |
+          multipass-exporter-linux-amd64
+          multipass-exporter-linux-arm64
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
