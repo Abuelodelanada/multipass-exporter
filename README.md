@@ -22,6 +22,9 @@ This exporter provides metrics about Multipass virtual machines, making it easy 
 | `multipass_instances_suspended` | Gauge | Number of suspended Multipass instances |
 | `multipass_instance_memory_bytes` | Gauge | Memory usage of Multipass instances in bytes (with `name` and `release` labels) |
 | `multipass_instance_cpu_total` | Gauge | Total number of CPUs in Multipass instances (with `name` and `release` labels) |
+| `multipass_instance_load_1m` | Gauge | Average number of processes running on CPU or in queue waiting for CPU time in the last minute (with `name` and `release` labels) |
+| `multipass_instance_load_5m` | Gauge | Average number of processes running on CPU or in queue waiting for CPU time in the last 5 minutes (with `name` and `release` labels) |
+| `multipass_instance_load_15m` | Gauge | Average number of processes running on CPU or in queue waiting for CPU time in the last 15 minutes (with `name` and `release` labels) |
 | `multipass_error` | Gauge | Error indicator (1 when collection fails, 0 otherwise) |
 
 ## Installation
@@ -131,6 +134,24 @@ multipass_instance_memory_bytes{name="edp",release="Ubuntu 23.10"} 1.530298368e+
 multipass_instance_cpu_total{name="charm-dev-36",release="Ubuntu 24.04.3 LTS"} 2
 multipass_instance_cpu_total{name="coslite",release="Ubuntu 22.04.2 LTS"} 1
 multipass_instance_cpu_total{name="edp",release="Ubuntu 23.10"} 4
+
+# HELP multipass_instance_load_1m Average number of processes running on CPU or in queue waiting for CPU time in the last minute
+# TYPE multipass_instance_load_1m gauge
+multipass_instance_load_1m{name="charm-dev-36",release="Ubuntu 24.04.3 LTS"} 0.11
+multipass_instance_load_1m{name="coslite",release="Ubuntu 22.04.2 LTS"} 0.23
+multipass_instance_load_1m{name="edp",release="Ubuntu 23.10"} 0.15
+
+# HELP multipass_instance_load_5m Average number of processes running on CPU or in queue waiting for CPU time in the last 5 minutes
+# TYPE multipass_instance_load_5m gauge
+multipass_instance_load_5m{name="charm-dev-36",release="Ubuntu 24.04.3 LTS"} 0.23
+multipass_instance_load_5m{name="coslite",release="Ubuntu 22.04.2 LTS"} 0.3
+multipass_instance_load_5m{name="edp",release="Ubuntu 23.10"} 0.28
+
+# HELP multipass_instance_load_15m Average number of processes running on CPU or in queue waiting for CPU time in the last 15 minutes
+# TYPE multipass_instance_load_15m gauge
+multipass_instance_load_15m{name="charm-dev-36",release="Ubuntu 24.04.3 LTS"} 0.3
+multipass_instance_load_15m{name="coslite",release="Ubuntu 22.04.2 LTS"} 0.4
+multipass_instance_load_15m{name="edp",release="Ubuntu 23.10"} 0.35
 
 # HELP multipass_error Error collecting metrics from Multipass
 # TYPE multipass_error gauge

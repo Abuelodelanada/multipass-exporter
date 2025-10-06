@@ -80,6 +80,9 @@ type MultipassCollector struct {
 	instanceSuspended   *prometheus.Desc
 	instanceMemoryBytes *prometheus.Desc
 	instanceCPUTotal    *prometheus.Desc
+	instanceLoad1m      *prometheus.Desc
+	instanceLoad5m      *prometheus.Desc
+	instanceLoad15m     *prometheus.Desc
 	timeout             time.Duration
 	executor            CommandExecutor
 	logger              *logrus.Logger
@@ -140,6 +143,21 @@ func NewMultipassCollectorWithExecutor(timeoutSeconds int, executor CommandExecu
 			"Total number of CPUs  in Multipass instances",
 			[]string{"name", "release"}, nil,
 		),
+		instanceLoad1m: prometheus.NewDesc(
+			"multipass_instance_load_1m",
+			"Average number of processes running on the CPU or in queue waiting for CPU time in the last minute",
+			[]string{"name", "release"}, nil,
+		),
+		instanceLoad5m: prometheus.NewDesc(
+			"multipass_instance_load_5m",
+			"Average number of processes running on the CPU or in queue waiting for CPU time in the last 5 minutes",
+			[]string{"name", "release"}, nil,
+		),
+		instanceLoad15m: prometheus.NewDesc(
+			"multipass_instance_load_15m",
+			"Average number of processes running on the CPU or in queue waiting for CPU time in the last 15 minutes",
+			[]string{"name", "release"}, nil,
+		),
 		timeout:  time.Duration(timeoutSeconds) * time.Second,
 		executor: executor,
 		logger:   logger,
@@ -165,6 +183,9 @@ func (c *MultipassCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.instanceSuspended
 	ch <- c.instanceMemoryBytes
 	ch <- c.instanceCPUTotal
+	ch <- c.instanceLoad1m
+	ch <- c.instanceLoad5m
+	ch <- c.instanceLoad15m
 }
 
 // Collect fetches instance count and sends to Prometheus
@@ -203,6 +224,11 @@ func (c *MultipassCollector) Collect(ch chan<- prometheus.Metric) {
 
 	if err := c.collectInstanceCPUTotalWithData(ch, data); err != nil {
 		c.logger.WithError(err).Error("Failed to collect instance CPUs")
+		c.collectError(ch, err)
+		return
+	}
+	if err := c.collectInstanceLoadWithData(ch, data); err != nil {
+		c.logger.WithError(err).Error("Failed to collect instance Load")
 		c.collectError(ch, err)
 		return
 	}
@@ -291,6 +317,57 @@ func (c *MultipassCollector) collectInstanceCPUTotalWithData(ch chan<- prometheu
 	}
 
 	c.logger.WithField("metrics_collected", metricsCollected).Info("Successfully collected CPU metrics")
+	return nil
+}
+
+func (c *MultipassCollector) collectInstanceLoadWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse) error {
+	c.logger.WithField("instance_count", len(data.Info)).Info("Collecting CPU Load metrics")
+	metricsCollected := 0
+
+	for name, info := range data.Info {
+		if len(info.Load) != 3 {
+			c.logger.WithField("instance", name).Debug("Skipping instance - Load has wrong data (need 3 values)")
+			continue
+		}
+
+		load1m := info.Load[0]
+		load5m := info.Load[1]
+		load15m := info.Load[2]
+		c.logger.WithFields(logrus.Fields{
+			"instance": name,
+			"load1m":   load1m,
+		}).Debug("Adding Load 1m")
+		c.logger.WithFields(logrus.Fields{
+			"instance": name,
+			"load5m":   load5m,
+		}).Debug("Adding Load 5m")
+		c.logger.WithFields(logrus.Fields{
+			"instance": name,
+			"load15m":  load15m,
+		}).Debug("Adding Load 15m")
+
+		ch <- prometheus.MustNewConstMetric(
+			c.instanceLoad1m,
+			prometheus.GaugeValue,
+			float64(load1m),
+			name, info.Release,
+		)
+		ch <- prometheus.MustNewConstMetric(
+			c.instanceLoad5m,
+			prometheus.GaugeValue,
+			float64(load5m),
+			name, info.Release,
+		)
+		ch <- prometheus.MustNewConstMetric(
+			c.instanceLoad15m,
+			prometheus.GaugeValue,
+			float64(load15m),
+			name, info.Release,
+		)
+		metricsCollected++
+	}
+
+	c.logger.WithField("metrics_collected", metricsCollected).Info("Successfully collected CPU Load metrics")
 	return nil
 }
 
