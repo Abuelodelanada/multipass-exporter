@@ -122,7 +122,7 @@ func TestCreateTestApp(t *testing.T) {
 	app := createTestApp("test.yaml")
 
 	if app == nil {
-		t.Error("createTestApp should not return nil")
+		t.Fatal("createTestApp should not return nil")
 	}
 
 	if app.configPath != "test.yaml" {

@@ -47,7 +47,8 @@ func (f *FailingCommandExecutor) CommandContext(ctx context.Context, name string
 	cmd := exec.CommandContext(ctx, "false")
 	if f.stderr != "" {
 		// We can't easily mock stderr with the current approach
-		// but we can simulate failure
+		// TODO: Implement proper stderr mocking if needed
+		_ = f.stderr // Suppress unused variable warning
 	}
 	return cmd
 }
@@ -187,7 +188,7 @@ func TestDescribe(t *testing.T) {
 		descriptions = append(descriptions, desc)
 	}
 
-	if len(descriptions) != 6 {
+	if len(descriptions) != 7 {
 		t.Errorf("Expected 6 metric descriptions, got %d", len(descriptions))
 	}
 }
@@ -342,6 +343,103 @@ func TestCollectInstanceMemoryBytes_WithMock(t *testing.T) {
 	}
 	if values[0] != 268435456 && values[1] != 268435456 {
 		t.Errorf("Expected one metric to be 268435456 (256MB), but got %f and %f", values[0], values[1])
+	}
+
+	// Verify names and releases were collected (use the variables to avoid SA4010)
+	if len(names) != 2 || len(releases) != 2 {
+		t.Errorf("Expected 2 names and 2 releases, got %d names and %d releases", len(names), len(releases))
+	}
+}
+
+func TestCollectInstanceTotalCPU_WithMock(t *testing.T) {
+	mockJSON := `{
+		"info": {
+			"instance1": {
+				"name": "instance1",
+				"state": "Running",
+				"ipv4": ["192.168.64.2"],
+				"release": "22.04 LTS",
+                                "cpu_count": "1",
+				"memory": {
+					"total": 1610612736,
+					"used": 536870912
+				}
+			},
+			"instance2": {
+				"name": "instance2",
+				"state": "Stopped",
+				"ipv4": [],
+				"release": "20.04 LTS",
+                                "cpu_count": "3",
+				"memory": {
+					"total": 1073741824,
+					"used": 268435456
+				}
+			}
+		}
+	}`
+	mockExecutor := &MockCommandExecutor{output: mockJSON}
+
+	collector := NewMultipassCollectorWithExecutor(5, mockExecutor)
+
+	// Parse the JSON manually to create the data object
+	var data MultipassInfoResponse
+	if err := json.Unmarshal([]byte(mockJSON), &data); err != nil {
+		t.Fatalf("Failed to parse mock JSON: %v", err)
+	}
+
+	ch := make(chan prometheus.Metric, 10)
+
+	err := collector.collectInstanceCPUTotalWithData(ch, data)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	close(ch)
+
+	metricCount := 0
+	var values []float64
+	var names []string
+	var releases []string
+
+	for metric := range ch {
+		metricCount++
+		pb := &dto.Metric{}
+		if err := metric.Write(pb); err != nil {
+			t.Fatalf("Failed to write metric: %v", err)
+		}
+
+		values = append(values, *pb.Gauge.Value)
+		if pb.Label != nil {
+			for _, label := range pb.Label {
+				if label.GetName() == "name" {
+					names = append(names, label.GetValue())
+				}
+				if label.GetName() == "release" {
+					releases = append(releases, label.GetValue())
+				}
+			}
+		}
+	}
+
+	if metricCount != 2 {
+		t.Errorf("Expected 2 metrics, got %d", metricCount)
+	}
+
+	if len(values) != 2 {
+		t.Errorf("Expected 2 values, got %d", len(values))
+	}
+
+	if values[0] != 1 {
+		t.Errorf("Expected one metric to be 1, but got %f", values[0])
+	}
+	if values[1] != 3 {
+		t.Errorf("Expected one metric to be 3, but got %f", values[1])
+	}
+
+	// Verify names and releases were collected (use the variables to avoid SA4010)
+	if len(names) != 2 || len(releases) != 2 {
+		t.Errorf("Expected 2 names and 2 releases, got %d names and %d releases", len(names), len(releases))
 	}
 }
 

@@ -21,6 +21,7 @@ This exporter provides metrics about Multipass virtual machines, making it easy 
 | `multipass_instances_deleted` | Gauge | Number of deleted Multipass instances |
 | `multipass_instances_suspended` | Gauge | Number of suspended Multipass instances |
 | `multipass_instance_memory_bytes` | Gauge | Memory usage of Multipass instances in bytes (with `name` and `release` labels) |
+| `multipass_instance_cpu_total` | Gauge | Total number of CPUs in Multipass instances (with `name` and `release` labels) |
 | `multipass_error` | Gauge | Error indicator (1 when collection fails, 0 otherwise) |
 
 ## Installation
@@ -125,6 +126,12 @@ multipass_instance_memory_bytes{name="charm-dev-36",release="Ubuntu 24.04.3 LTS"
 multipass_instance_memory_bytes{name="coslite",release="Ubuntu 22.04.2 LTS"} 2.986962944e+09
 multipass_instance_memory_bytes{name="edp",release="Ubuntu 23.10"} 1.530298368e+09
 
+# HELP multipass_instance_cpu_total Total number of CPUs in Multipass instances
+# TYPE multipass_instance_cpu_total gauge
+multipass_instance_cpu_total{name="charm-dev-36",release="Ubuntu 24.04.3 LTS"} 2
+multipass_instance_cpu_total{name="coslite",release="Ubuntu 22.04.2 LTS"} 1
+multipass_instance_cpu_total{name="edp",release="Ubuntu 23.10"} 4
+
 # HELP multipass_error Error collecting metrics from Multipass
 # TYPE multipass_error gauge
 multipass_error 0
@@ -208,6 +215,7 @@ DEBUG  [2025-09-22T23:35:03-03:00] Collecting instance stopped                  
 DEBUG  [2025-09-22T23:35:03-03:00] Collecting instance deleted                   count=1
 DEBUG  [2025-09-22T23:35:03-03:00] Collecting instance suspended                 count=0
 INFO   [2025-09-22T23:35:03-03:00] Collecting memory metrics                     instance_count=8
+DEBUG  [2025-09-22T23:35:03-03:00] Collecting CPU metrics                        instance_count=8
 ```
 
 ## Contributing
