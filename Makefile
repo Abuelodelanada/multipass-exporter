@@ -31,18 +31,23 @@ lint:
 		go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59.1; \
 	fi
 	@echo "Running golangci-lint..."
-	@golangci-lint run --timeout=5m
+	@golangci-lint run --timeout=2m --max-same-issues=10 --max-issues-per-linter=20
 
 lint-fast:
 	@if ! command -v golangci-lint >/dev/null 2>&1; then \
 		echo "Installing golangci-lint..."; \
 		go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59.1; \
 	fi
-	@echo "Running golangci-lint (fast mode)..."
-	@golangci-lint run --fast
+	@echo "Running golangci-lint (CI mode)..."
+	@golangci-lint run --max-issues-per-linter=10 --max-same-issues=5 --timeout=1m
 
 fmt:
 	go fmt ./...
+
+lint-ci:
+	@echo "Running basic linting for CI..."
+	@go fmt ./...
+	@go vet ./...
 
 deps:
 	go mod tidy

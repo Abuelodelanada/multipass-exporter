@@ -188,8 +188,8 @@ func TestDescribe(t *testing.T) {
 		descriptions = append(descriptions, desc)
 	}
 
-	if len(descriptions) != 7 {
-		t.Errorf("Expected 6 metric descriptions, got %d", len(descriptions))
+	if len(descriptions) != 10 {
+		t.Errorf("Expected 10 metric descriptions, got %d", len(descriptions))
 	}
 }
 
@@ -440,6 +440,119 @@ func TestCollectInstanceTotalCPU_WithMock(t *testing.T) {
 	// Verify names and releases were collected (use the variables to avoid SA4010)
 	if len(names) != 2 || len(releases) != 2 {
 		t.Errorf("Expected 2 names and 2 releases, got %d names and %d releases", len(names), len(releases))
+	}
+}
+
+func TestCollectInstanceLoad_WithMock(t *testing.T) {
+	mockJSON := `{
+		"info": {
+			"instance1": {
+				"name": "instance1",
+				"state": "Running",
+				"ipv4": ["192.168.64.2"],
+				"release": "22.04 LTS",
+                                "cpu_count": "1",
+                                "load": [
+                                   0.11,
+                                   0.23,
+                                   0.3
+                                ],
+				"memory": {
+					"total": 1610612736,
+					"used": 536870912
+				}
+			},
+			"instance2": {
+				"name": "instance2",
+				"state": "Stopped",
+				"ipv4": [],
+				"release": "20.04 LTS",
+                                "cpu_count": "3",
+                                "load": [
+                                   0,
+                                   0,
+                                   0
+                                ],
+				"memory": {
+					"total": 1073741824,
+					"used": 268435456
+				}
+			}
+		}
+	}`
+	mockExecutor := &MockCommandExecutor{output: mockJSON}
+
+	collector := NewMultipassCollectorWithExecutor(5, mockExecutor)
+
+	// Parse the JSON manually to create the data object
+	var data MultipassInfoResponse
+	if err := json.Unmarshal([]byte(mockJSON), &data); err != nil {
+		t.Fatalf("Failed to parse mock JSON: %v", err)
+	}
+
+	ch := make(chan prometheus.Metric, 10)
+
+	err := collector.collectInstanceLoadWithData(ch, data)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	close(ch)
+
+	metricCount := 0
+	var values []float64
+	var names []string
+	var releases []string
+
+	for metric := range ch {
+		metricCount++
+		pb := &dto.Metric{}
+		if err := metric.Write(pb); err != nil {
+			t.Fatalf("Failed to write metric: %v", err)
+		}
+
+		values = append(values, *pb.Gauge.Value)
+		if pb.Label != nil {
+			for _, label := range pb.Label {
+				if label.GetName() == "name" {
+					names = append(names, label.GetValue())
+				}
+				if label.GetName() == "release" {
+					releases = append(releases, label.GetValue())
+				}
+			}
+		}
+	}
+
+	if metricCount != 6 {
+		t.Errorf("Expected 6 metrics, got %d", metricCount)
+	}
+
+	if len(values) != 6 {
+		t.Errorf("Expected 6 values, got %d", len(values))
+	}
+
+	if values[0] != 0.11 {
+		t.Errorf("Expected one metric to be 0.11, but got %f", values[0])
+	}
+	if values[1] != 0.23 {
+		t.Errorf("Expected one metric to be 0.23, but got %f", values[1])
+	}
+	if values[2] != 0.3 {
+		t.Errorf("Expected one metric to be 0.3, but got %f", values[2])
+	}
+	if values[3] != 0 {
+		t.Errorf("Expected one metric to be 0, but got %f", values[3])
+	}
+	if values[4] != 0 {
+		t.Errorf("Expected one metric to be 0, but got %f", values[4])
+	}
+	if values[5] != 0 {
+		t.Errorf("Expected one metric to be 0, but got %f", values[5])
+	}
+	// Verify names and releases were collected (use the variables to avoid SA4010)
+	if len(names) != 6 || len(releases) != 6 {
+		t.Errorf("Expected 6 names and 6 releases, got %d names and %d releases", len(names), len(releases))
 	}
 }
 
