@@ -201,8 +201,8 @@ func TestDescribe(t *testing.T) {
 		descriptions = append(descriptions, desc)
 	}
 
-	if len(descriptions) != 11 {
-		t.Errorf("Expected 11 metric descriptions, got %d", len(descriptions))
+	if len(descriptions) != 12 {
+		t.Errorf("Expected 12 metric descriptions, got %d", len(descriptions))
 	}
 }
 
@@ -825,9 +825,9 @@ func TestCollectMain(t *testing.T) {
 		metricsCount++
 	}
 
-	// Should collect: total, running, stopped, deleted, suspended, memory(2), cpu(2), load(6), disk(2) = 15 metrics
-	if metricsCount < 15 {
-		t.Errorf("Expected at least 15 metrics, got %d", metricsCount)
+	// Should collect: total, running, stopped, deleted, suspended, memory(2), cpu(2), load(6), disk-used(2), disk-total(2) = 17 metrics
+	if metricsCount < 17 {
+		t.Errorf("Expected at least 17 metrics, got %d", metricsCount)
 	}
 }
 

@@ -85,6 +85,7 @@ type MultipassCollector struct {
 	instanceLoad5m      *prometheus.Desc
 	instanceLoad15m     *prometheus.Desc
 	instanceDiskUsed    *prometheus.Desc
+	instanceDiskTotal   *prometheus.Desc
 	timeout             time.Duration
 	executor            CommandExecutor
 	logger              *logrus.Logger
@@ -165,6 +166,11 @@ func NewMultipassCollectorWithExecutor(timeoutSeconds int, executor CommandExecu
 			"Disk usage in bytes in Multipass instances",
 			[]string{"name", "disk", "release"}, nil,
 		),
+		instanceDiskTotal: prometheus.NewDesc(
+			"multipass_instance_disk_total_bytes",
+			"Total disk space in bytes in Multipass instances",
+			[]string{"name", "disk", "release"}, nil,
+		),
 		timeout:  time.Duration(timeoutSeconds) * time.Second,
 		executor: executor,
 		logger:   logger,
@@ -194,6 +200,7 @@ func (c *MultipassCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.instanceLoad5m
 	ch <- c.instanceLoad15m
 	ch <- c.instanceDiskUsed
+	ch <- c.instanceDiskTotal
 }
 
 // Collect fetches instance count and sends to Prometheus
@@ -242,6 +249,11 @@ func (c *MultipassCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 	if err := c.collectInstanceDiskUsedWithData(ch, data); err != nil {
 		c.logger.WithError(err).Error("Failed to collect instance Disk used")
+		c.collectError(ch, err)
+		return
+	}
+	if err := c.collectInstanceDiskTotalWithData(ch, data); err != nil {
+		c.logger.WithError(err).Error("Failed to collect instance Disk total")
 		c.collectError(ch, err)
 		return
 	}
@@ -386,7 +398,7 @@ func (c *MultipassCollector) collectInstanceLoadWithData(ch chan<- prometheus.Me
 }
 
 func (c *MultipassCollector) collectInstanceDiskUsedWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse) error {
-	c.logger.WithField("instance_count", len(data.Info)).Info("Collecting Disk metrics")
+	c.logger.WithField("instance_count", len(data.Info)).Info("Collecting Disk used metrics")
 	metricsCollected := 0
 
 	for name, info := range data.Info {
@@ -447,6 +459,71 @@ func (c *MultipassCollector) collectInstanceDiskUsedWithData(ch chan<- prometheu
 	}
 
 	c.logger.WithField("metrics_collected", metricsCollected).Info("Successfully collected disk metrics")
+	return nil
+}
+
+func (c *MultipassCollector) collectInstanceDiskTotalWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse) error {
+	c.logger.WithField("instance_count", len(data.Info)).Info("Collecting Disk total metrics")
+	metricsCollected := 0
+
+	for name, info := range data.Info {
+		c.logger.WithField("instance", name).Debug("Processing instance for disk total metrics")
+
+		if info.Disks == nil {
+			c.logger.WithField("instance", name).Debug("Skipping instance - Disks is empty")
+			continue
+		}
+
+		c.logger.WithFields(logrus.Fields{
+			"instance": name,
+			"disks":    len(info.Disks),
+		}).Debug("Instance has disks")
+
+		// Iterar sobre cada disco de la instancia
+		for diskName, diskInfo := range info.Disks {
+			c.logger.WithFields(logrus.Fields{
+				"instance": name,
+				"disk":     diskName,
+				"total":    diskInfo.Total,
+			}).Debug("Processing disk total")
+
+			if diskInfo.Total == "" {
+				c.logger.WithFields(logrus.Fields{
+					"instance": name,
+					"disk":     diskName,
+				}).Debug("Skipping disk - total is empty")
+				continue
+			}
+
+			// Parsear el valor de disco total usando strconv.ParseInt
+			diskTotal, err := strconv.ParseInt(diskInfo.Total, 10, 64)
+			if err != nil {
+				c.logger.WithError(err).WithFields(logrus.Fields{
+					"instance": name,
+					"disk":     diskName,
+					"total":    diskInfo.Total,
+				}).Error("Failed to parse disk total value")
+				continue
+			}
+
+			c.logger.WithFields(logrus.Fields{
+				"instance":      name,
+				"disk":          diskName,
+				"disk_total":    diskTotal,
+				"release":       info.Release,
+			}).Debug("Adding disk total metric")
+
+			ch <- prometheus.MustNewConstMetric(
+				c.instanceDiskTotal,
+				prometheus.GaugeValue,
+				float64(diskTotal),
+				name, diskName, info.Release,
+			)
+			metricsCollected++
+		}
+	}
+
+	c.logger.WithField("metrics_collected", metricsCollected).Info("Successfully collected disk total metrics")
 	return nil
 }
 
