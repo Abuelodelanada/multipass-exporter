@@ -25,6 +25,8 @@ This exporter provides metrics about Multipass virtual machines, making it easy 
 | `multipass_instance_load_1m` | Gauge | Average number of processes running on CPU or in queue waiting for CPU time in the last minute (with `name` and `release` labels) |
 | `multipass_instance_load_5m` | Gauge | Average number of processes running on CPU or in queue waiting for CPU time in the last 5 minutes (with `name` and `release` labels) |
 | `multipass_instance_load_15m` | Gauge | Average number of processes running on CPU or in queue waiting for CPU time in the last 15 minutes (with `name` and `release` labels) |
+| `multipass_instance_disk_used_bytes` | Gauge | Disk usage in bytes for Multipass instances (with `name`, `disk`, and `release` labels) |
+| `multipass_instance_disk_total_bytes` | Gauge | Total disk space in bytes for Multipass instances (with `name`, `disk`, and `release` labels) |
 | `multipass_error` | Gauge | Error indicator (1 when collection fails, 0 otherwise) |
 
 ## Installation
@@ -152,6 +154,18 @@ multipass_instance_load_5m{name="edp",release="Ubuntu 23.10"} 0.28
 multipass_instance_load_15m{name="charm-dev-36",release="Ubuntu 24.04.3 LTS"} 0.3
 multipass_instance_load_15m{name="coslite",release="Ubuntu 22.04.2 LTS"} 0.4
 multipass_instance_load_15m{name="edp",release="Ubuntu 23.10"} 0.35
+
+# HELP multipass_instance_disk_used_bytes Disk usage in bytes in Multipass instances
+# TYPE multipass_instance_disk_used_bytes gauge
+multipass_instance_disk_used_bytes{name="charm-dev-36",disk="sda1",release="Ubuntu 24.04.3 LTS"} 1.073741824e+10
+multipass_instance_disk_used_bytes{name="coslite",disk="sda1",release="Ubuntu 22.04.2 LTS"} 8.589934592e+09
+multipass_instance_disk_used_bytes{name="edp",disk="sda1",release="Ubuntu 23.10"} 5.36870912e+08
+
+# HELP multipass_instance_disk_total_bytes Total disk space in bytes in Multipass instances
+# TYPE multipass_instance_disk_total_bytes gauge
+multipass_instance_disk_total_bytes{name="charm-dev-36",disk="sda1",release="Ubuntu 24.04.3 LTS"} 2.147483648e+10
+multipass_instance_disk_total_bytes{name="coslite",disk="sda1",release="Ubuntu 22.04.2 LTS"} 1.717986918e+10
+multipass_instance_disk_total_bytes{name="edp",disk="sda1",release="Ubuntu 23.10"} 1.073741824e+10
 
 # HELP multipass_error Error collecting metrics from Multipass
 # TYPE multipass_error gauge
