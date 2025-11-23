@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"sync"
 	"testing"
 	"time"
 
@@ -180,16 +181,28 @@ func TestDescribe(t *testing.T) {
 
 	ch := make(chan *prometheus.Desc, 10)
 
-	collector.Describe(ch)
+	var wg sync.WaitGroup
+	wg.Add(1)
 
-	close(ch)
+	// Start Describe in a goroutine
+	go func() {
+		defer wg.Done()
+		collector.Describe(ch)
+	}()
+
+	// Wait for Describe to finish in a separate goroutine
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+
 	descriptions := make([]*prometheus.Desc, 0)
 	for desc := range ch {
 		descriptions = append(descriptions, desc)
 	}
 
-	if len(descriptions) != 10 {
-		t.Errorf("Expected 10 metric descriptions, got %d", len(descriptions))
+	if len(descriptions) != 11 {
+		t.Errorf("Expected 11 metric descriptions, got %d", len(descriptions))
 	}
 }
 
@@ -783,26 +796,38 @@ func TestCollectInstanceSuspendedWithData(t *testing.T) {
 func TestCollectMain(t *testing.T) {
 	mockJSON := `{
 		"info": {
-			"test1": {"name": "test1", "state": "Running", "ipv4": [], "release": "22.04 LTS", "memory": {"total": 1073741824, "used": 536870912}},
-			"test2": {"name": "test2", "state": "Stopped", "ipv4": [], "release": "20.04 LTS", "memory": {"total": 1073741824, "used": 268435456}}
+			"test1": {"name": "test1", "state": "Running", "ipv4": [], "release": "22.04 LTS", "memory": {"total": 1073741824, "used": 536870912}, "cpu_count": "2", "load": [0.1, 0.2, 0.3], "disks": {"sda1": {"total": "10737418240", "used": "1073741824"}}},
+			"test2": {"name": "test2", "state": "Stopped", "ipv4": [], "release": "20.04 LTS", "memory": {"total": 1073741824, "used": 268435456}, "cpu_count": "1", "load": [0.0, 0.0, 0.0], "disks": {"sda1": {"total": "8589934592", "used": "536870912"}}}
 		}
 	}`
 	mockExecutor := &MockCommandExecutor{output: mockJSON}
 	collector := NewMultipassCollectorWithExecutor(5, mockExecutor)
 
 	ch := make(chan prometheus.Metric, 10)
-	collector.Collect(ch)
 
-	close(ch)
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	// Start collection in a goroutine
+	go func() {
+		defer wg.Done()
+		collector.Collect(ch)
+	}()
+
+	// Wait for collection to finish in a separate goroutine
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
 
 	metricsCount := 0
 	for range ch {
 		metricsCount++
 	}
 
-	// Should collect: total, running, stopped, deleted, suspended, memory metrics, and potentially error
-	if metricsCount < 6 {
-		t.Errorf("Expected at least 6 metrics, got %d", metricsCount)
+	// Should collect: total, running, stopped, deleted, suspended, memory(2), cpu(2), load(6), disk(2) = 15 metrics
+	if metricsCount < 15 {
+		t.Errorf("Expected at least 15 metrics, got %d", metricsCount)
 	}
 }
 
