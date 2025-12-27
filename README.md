@@ -191,11 +191,10 @@ scrape_configs:
 
 ```bash
 # Build for current Linux platform
-go build -o multipass-exporter ./cmd/multipass-exporter
+make build
 
-# Build for different Linux architectures
-GOARCH=amd64 go build -o multipass-exporter-amd64 ./cmd/multipass-exporter
-GOARCH=arm64 go build -o multipass-exporter-arm64 ./cmd/multipass-exporter
+# Build for amd64 and arm64
+make build-all
 ```
 
 ### Linting

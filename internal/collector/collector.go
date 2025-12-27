@@ -38,6 +38,13 @@ type DiskInfo struct {
 	Used  string `json:"used"`
 }
 
+func (d DiskInfo) toMap() map[string]string {
+	return map[string]string{
+		"Total": d.Total,
+		"Used":  d.Used,
+	}
+}
+
 type Mount struct {
 	Name        string   `json:"name"`
 	Path        string   `json:"path"`
@@ -247,12 +254,12 @@ func (c *MultipassCollector) Collect(ch chan<- prometheus.Metric) {
 		c.collectError(ch, err)
 		return
 	}
-	if err := c.collectInstanceDiskUsedWithData(ch, data); err != nil {
+	if err := c.collectInstanceDiskWithData(ch, data, "Used", c.instanceDiskUsed); err != nil {
 		c.logger.WithError(err).Error("Failed to collect instance Disk used")
 		c.collectError(ch, err)
 		return
 	}
-	if err := c.collectInstanceDiskTotalWithData(ch, data); err != nil {
+	if err := c.collectInstanceDiskWithData(ch, data, "Total", c.instanceDiskTotal); err != nil {
 		c.logger.WithError(err).Error("Failed to collect instance Disk total")
 		c.collectError(ch, err)
 		return
@@ -345,7 +352,6 @@ func (c *MultipassCollector) collectInstanceCPUTotalWithData(ch chan<- prometheu
 	return nil
 }
 
-
 func (c *MultipassCollector) collectInstanceLoadWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse) error {
 	c.logger.WithField("instance_count", len(data.Info)).Info("Collecting CPU Load metrics")
 	metricsCollected := 0
@@ -397,13 +403,12 @@ func (c *MultipassCollector) collectInstanceLoadWithData(ch chan<- prometheus.Me
 	return nil
 }
 
-func (c *MultipassCollector) collectInstanceDiskUsedWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse) error {
-	c.logger.WithField("instance_count", len(data.Info)).Info("Collecting Disk used metrics")
+func (c *MultipassCollector) collectInstanceDiskWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse, diskMetricType string, metricDesc *prometheus.Desc) error {
+
+	c.logger.WithField("instance_count", len(data.Info)).Info("Collecting Disk metrics")
 	metricsCollected := 0
 
 	for name, info := range data.Info {
-		c.logger.WithField("instance", name).Debug("Processing instance for disk metrics")
-
 		if info.Disks == nil {
 			c.logger.WithField("instance", name).Debug("Skipping instance - Disks is empty")
 			continue
@@ -414,44 +419,48 @@ func (c *MultipassCollector) collectInstanceDiskUsedWithData(ch chan<- prometheu
 			"disks":    len(info.Disks),
 		}).Debug("Instance has disks")
 
-		// Iterar sobre cada disco de la instancia
 		for diskName, diskInfo := range info.Disks {
-			c.logger.WithFields(logrus.Fields{
-				"instance": name,
-				"disk":     diskName,
-				"used":     diskInfo.Used,
-			}).Debug("Processing disk")
 
-			if diskInfo.Used == "" {
+			diskMap := diskInfo.toMap()
+			c.logger.WithFields(logrus.Fields{
+				"instance":    name,
+				"disk":        diskName,
+				"metric_type": diskMetricType,
+				"value":       diskMap[diskMetricType],
+			}).Debug("Processing disk metric")
+
+			if diskMap[diskMetricType] == "" {
 				c.logger.WithFields(logrus.Fields{
-					"instance": name,
-					"disk":     diskName,
-				}).Debug("Skipping disk - used is empty")
+					"instance":    name,
+					"disk":        diskName,
+					"metric_type": diskMetricType,
+				}).Debug("Skipping disk metric, value is empty")
 				continue
 			}
 
-			// Parsear el valor de disco usado usando strconv.ParseInt
-			diskUsed, err := strconv.ParseInt(diskInfo.Used, 10, 64)
+			val, err := strconv.ParseInt(diskMap[diskMetricType], 10, 64)
 			if err != nil {
 				c.logger.WithError(err).WithFields(logrus.Fields{
-					"instance": name,
-					"disk":     diskName,
-					"used":     diskInfo.Used,
-				}).Error("Failed to parse disk used value")
+					"instance":    name,
+					"disk":        diskName,
+					"metric_type": diskMetricType,
+					"value":       diskMap[diskMetricType],
+				}).Error("Failed to parse disk metric value")
 				continue
 			}
 
 			c.logger.WithFields(logrus.Fields{
-				"instance":     name,
-				"disk":         diskName,
-				"disk_used":    diskUsed,
-				"release":      info.Release,
+				"instance":    name,
+				"disk":        diskName,
+				"metric_type": diskMetricType,
+				"value":       val,
+				"release":     info.Release,
 			}).Debug("Adding disk metric")
 
 			ch <- prometheus.MustNewConstMetric(
-				c.instanceDiskUsed,
+				metricDesc,
 				prometheus.GaugeValue,
-				float64(diskUsed),
+				float64(val),
 				name, diskName, info.Release,
 			)
 			metricsCollected++
@@ -459,71 +468,6 @@ func (c *MultipassCollector) collectInstanceDiskUsedWithData(ch chan<- prometheu
 	}
 
 	c.logger.WithField("metrics_collected", metricsCollected).Info("Successfully collected disk metrics")
-	return nil
-}
-
-func (c *MultipassCollector) collectInstanceDiskTotalWithData(ch chan<- prometheus.Metric, data MultipassInfoResponse) error {
-	c.logger.WithField("instance_count", len(data.Info)).Info("Collecting Disk total metrics")
-	metricsCollected := 0
-
-	for name, info := range data.Info {
-		c.logger.WithField("instance", name).Debug("Processing instance for disk total metrics")
-
-		if info.Disks == nil {
-			c.logger.WithField("instance", name).Debug("Skipping instance - Disks is empty")
-			continue
-		}
-
-		c.logger.WithFields(logrus.Fields{
-			"instance": name,
-			"disks":    len(info.Disks),
-		}).Debug("Instance has disks")
-
-		// Iterar sobre cada disco de la instancia
-		for diskName, diskInfo := range info.Disks {
-			c.logger.WithFields(logrus.Fields{
-				"instance": name,
-				"disk":     diskName,
-				"total":    diskInfo.Total,
-			}).Debug("Processing disk total")
-
-			if diskInfo.Total == "" {
-				c.logger.WithFields(logrus.Fields{
-					"instance": name,
-					"disk":     diskName,
-				}).Debug("Skipping disk - total is empty")
-				continue
-			}
-
-			// Parsear el valor de disco total usando strconv.ParseInt
-			diskTotal, err := strconv.ParseInt(diskInfo.Total, 10, 64)
-			if err != nil {
-				c.logger.WithError(err).WithFields(logrus.Fields{
-					"instance": name,
-					"disk":     diskName,
-					"total":    diskInfo.Total,
-				}).Error("Failed to parse disk total value")
-				continue
-			}
-
-			c.logger.WithFields(logrus.Fields{
-				"instance":      name,
-				"disk":          diskName,
-				"disk_total":    diskTotal,
-				"release":       info.Release,
-			}).Debug("Adding disk total metric")
-
-			ch <- prometheus.MustNewConstMetric(
-				c.instanceDiskTotal,
-				prometheus.GaugeValue,
-				float64(diskTotal),
-				name, diskName, info.Release,
-			)
-			metricsCollected++
-		}
-	}
-
-	c.logger.WithField("metrics_collected", metricsCollected).Info("Successfully collected disk total metrics")
 	return nil
 }
 

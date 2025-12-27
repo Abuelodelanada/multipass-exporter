@@ -443,11 +443,22 @@ func TestCollectInstanceTotalCPU_WithMock(t *testing.T) {
 		t.Errorf("Expected 2 values, got %d", len(values))
 	}
 
-	if values[0] != 1 {
-		t.Errorf("Expected one metric to be 1, but got %f", values[0])
+	// Check that we have both expected values (order is not guaranteed with maps)
+	hasValue1 := false
+	hasValue3 := false
+	for _, v := range values {
+		if v == 1 {
+			hasValue1 = true
+		}
+		if v == 3 {
+			hasValue3 = true
+		}
 	}
-	if values[1] != 3 {
-		t.Errorf("Expected one metric to be 3, but got %f", values[1])
+	if !hasValue1 {
+		t.Errorf("Expected to find value 1 in metrics, got %v", values)
+	}
+	if !hasValue3 {
+		t.Errorf("Expected to find value 3 in metrics, got %v", values)
 	}
 
 	// Verify names and releases were collected (use the variables to avoid SA4010)

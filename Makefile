@@ -4,10 +4,7 @@ export PATH := $(shell go env GOPATH)/bin:$(PATH)
 .PHONY: test lint
 
 test:
-	go test ./... -v
-
-test-cover:
-	go test ./... -cover
+	go test ./... -v -cover
 
 test-cover-html:
 	go test ./... -coverprofile=coverage.out && go tool cover -html=coverage.out -o coverage.html
