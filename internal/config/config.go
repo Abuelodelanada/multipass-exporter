@@ -25,6 +25,23 @@ func DefaultConfig() *Config {
 	}
 }
 
+// Validate checks if the configuration values are valid
+func (c *Config) Validate() error {
+	if c.Port <= 0 {
+		return fmt.Errorf("port must be a positive integer, got %d", c.Port)
+	}
+
+	if c.Port > 65535 {
+		return fmt.Errorf("port must be between 1 and 65535, got %d", c.Port)
+	}
+
+	if c.TimeoutSeconds <= 0 {
+		return fmt.Errorf("timeout_seconds must be a positive integer, got %d", c.TimeoutSeconds)
+	}
+
+	return nil
+}
+
 // LoadConfig loads YAML file or returns defaults
 // Returns a boolean indicating if the file was actually loaded
 func LoadConfig(path string) (*Config, bool, error) {
@@ -38,6 +55,10 @@ func LoadConfig(path string) (*Config, bool, error) {
 
 	if err := yaml.Unmarshal(data, cfg); err != nil { //nolint:typecheck
 		return nil, false, fmt.Errorf("error parsing YAML: %w", err)
+	}
+
+	if err := cfg.Validate(); err != nil {
+		return nil, false, fmt.Errorf("invalid configuration: %w", err)
 	}
 
 	return cfg, true, nil

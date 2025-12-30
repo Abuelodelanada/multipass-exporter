@@ -171,3 +171,132 @@ func TestDefaultConfig(t *testing.T) {
 		t.Errorf("Expected default log level info, got %s", cfg.LogLevel)
 	}
 }
+
+func TestValidate_ValidConfig(t *testing.T) {
+	cfg := &Config{
+		Port:           8080,
+		MetricsPath:    "/metrics",
+		TimeoutSeconds: 10,
+		LogLevel:       "info",
+	}
+
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("Expected no error for valid config, got %v", err)
+	}
+}
+
+func TestValidate_NegativePort(t *testing.T) {
+	cfg := &Config{
+		Port:           -1,
+		MetricsPath:    "/metrics",
+		TimeoutSeconds: 10,
+		LogLevel:       "info",
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("Expected error for negative port, got nil")
+	}
+}
+
+func TestValidate_ZeroPort(t *testing.T) {
+	cfg := &Config{
+		Port:           0,
+		MetricsPath:    "/metrics",
+		TimeoutSeconds: 10,
+		LogLevel:       "info",
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("Expected error for zero port, got nil")
+	}
+}
+
+func TestValidate_PortTooHigh(t *testing.T) {
+	cfg := &Config{
+		Port:           70000,
+		MetricsPath:    "/metrics",
+		TimeoutSeconds: 10,
+		LogLevel:       "info",
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("Expected error for port > 65535, got nil")
+	}
+}
+
+func TestValidate_NegativeTimeout(t *testing.T) {
+	cfg := &Config{
+		Port:           8080,
+		MetricsPath:    "/metrics",
+		TimeoutSeconds: -5,
+		LogLevel:       "info",
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("Expected error for negative timeout, got nil")
+	}
+}
+
+func TestValidate_ZeroTimeout(t *testing.T) {
+	cfg := &Config{
+		Port:           8080,
+		MetricsPath:    "/metrics",
+		TimeoutSeconds: 0,
+		LogLevel:       "info",
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Error("Expected error for zero timeout, got nil")
+	}
+}
+
+func TestLoadConfig_InvalidPort(t *testing.T) {
+	configContent := `
+port: -100
+metrics_path: /metrics
+timeout_seconds: 10
+`
+
+	tempFile := filepath.Join(t.TempDir(), "invalid_port.yaml")
+	err := os.WriteFile(tempFile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	_, loaded, err := LoadConfig(tempFile)
+	if err == nil {
+		t.Fatal("Expected error for invalid port, got nil")
+	}
+
+	if loaded {
+		t.Error("Expected loaded to be false for invalid port")
+	}
+}
+
+func TestLoadConfig_InvalidTimeout(t *testing.T) {
+	configContent := `
+port: 8080
+metrics_path: /metrics
+timeout_seconds: -1
+`
+
+	tempFile := filepath.Join(t.TempDir(), "invalid_timeout.yaml")
+	err := os.WriteFile(tempFile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	_, loaded, err := LoadConfig(tempFile)
+	if err == nil {
+		t.Fatal("Expected error for invalid timeout, got nil")
+	}
+
+	if loaded {
+		t.Error("Expected loaded to be false for invalid timeout")
+	}
+}
